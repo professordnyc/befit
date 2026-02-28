@@ -4,9 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Befit – Your Today's Plan</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+
   <!-- ── Header ── -->
   <header class="app-header">
     <div class="header-inner">
@@ -23,13 +24,18 @@
 
       <div class="upload-area" id="upload-area" role="button" tabindex="0"
            aria-label="Click or tap to choose an image">
-        <img id="preview-img" class="preview-img hidden" alt="Your uploaded image preview" />
+        <!-- Preview image: hidden until a file is chosen -->
+        <img id="preview-img" class="preview-img" style="display:none" alt="Preview of your uploaded image" />
+        <!-- Placeholder: hidden once a file is chosen -->
         <div id="upload-placeholder" class="upload-placeholder">
           <span class="upload-icon">📷</span>
           <p>Tap to take a photo or upload an image</p>
         </div>
       </div>
-      <input type="file" id="file-input" accept="image/*" capture="environment" class="sr-only" />
+
+      <!-- Hidden real file input – triggered by clicking the upload area -->
+      <input type="file" id="file-input" accept="image/*" capture="environment"
+             style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden" />
     </section>
 
     <!-- ── Step 2 – Question ── -->
@@ -39,7 +45,7 @@
         id="user-query"
         class="query-input"
         rows="3"
-        placeholder="e.g. "I want to support my blood pressure" or "What's a quick healthy lunch from what I have?""
+        placeholder='e.g. "I want to support my blood pressure" or "What's a quick healthy lunch from what I have?"'
         aria-label="Your wellness question"
       ></textarea>
 
@@ -78,14 +84,14 @@
     <!-- ── Submit ── -->
     <button id="btn-submit" class="btn-primary" disabled>
       <span id="btn-label">Get My Today's Plan</span>
-      <span id="btn-spinner" class="spinner hidden" aria-hidden="true"></span>
+      <span id="btn-spinner" class="spinner" style="display:none" aria-hidden="true"></span>
     </button>
 
     <!-- ── Error banner ── -->
-    <div id="error-banner" class="error-banner hidden" role="alert"></div>
+    <div id="error-banner" class="error-banner" style="display:none" role="alert"></div>
 
-    <!-- ── Today's Plan card ── -->
-    <section id="today-card" class="today-card hidden" aria-live="polite">
+    <!-- ── Today's Plan card (hidden until a result arrives) ── -->
+    <section id="today-card" class="today-card" style="display:none" aria-live="polite">
 
       <header class="tc-header">
         <h2 class="tc-title">🌟 Today's Plan</h2>
@@ -93,13 +99,13 @@
       </header>
 
       <!-- Detected items -->
-      <div class="tc-section" id="tc-items-section">
+      <div class="tc-section" id="tc-items-section" style="display:none">
         <h3 class="tc-section-title">🛒 Items we noticed</h3>
         <ul id="tc-items" class="chip-list"></ul>
       </div>
 
       <!-- Risk flags -->
-      <div class="tc-section" id="tc-flags-section">
+      <div class="tc-section" id="tc-flags-section" style="display:none">
         <h3 class="tc-section-title">🔍 Things to be aware of</h3>
         <ul id="tc-flags" class="flag-list"></ul>
       </div>
@@ -131,6 +137,6 @@
     <p>Befit is not a medical tool. Always consult a qualified healthcare professional for personalised advice.</p>
   </footer>
 
-  <script src="app.js"></script>
+  <script src="/app.js"></script>
 </body>
 </html>

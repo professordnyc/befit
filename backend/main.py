@@ -4,6 +4,9 @@ main.py – Befit FastAPI backend.
 Endpoints:
   POST /scan-and-plan  – run the full Befit agent pipeline, return TodayCard JSON
   GET  /health         – liveness check
+  GET  /               – serve frontend index.html
+  GET  /style.css      – serve frontend stylesheet
+  GET  /app.js         – serve frontend script
 
 Configuration is read from environment variables (or a .env file via python-dotenv):
   OPENAI_API_KEY   – required (use your OpenRouter key or OpenAI key)
@@ -51,7 +54,7 @@ if not API_KEY:
 # ---------------------------------------------------------------------------
 # OpenAI-compatible async client
 # ---------------------------------------------------------------------------
-client = AsyncOpenAI(api_key=API_KEY, base_url=BASE_URL)
+client = AsyncOpenAI(api_key=API_KEY or "placeholder", base_url=BASE_URL)
 
 # ---------------------------------------------------------------------------
 # App
@@ -64,14 +67,21 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ---------------------------------------------------------------------------
-# Routes
+# Frontend path
+# ---------------------------------------------------------------------------
+FRONTEND_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "frontend")
+)
+
+# ---------------------------------------------------------------------------
+# API routes  (must be declared BEFORE the catch-all static mount)
 # ---------------------------------------------------------------------------
 
 @app.get("/health")
@@ -83,11 +93,7 @@ async def health():
 @app.post("/scan-and-plan", response_model=TodayCard)
 async def scan_and_plan(body: ScanAndPlanRequest) -> TodayCard:
     """
-    Run the full Befit agent pipeline:
-      Vision Interpreter → Context Interpreter → Risk Checker →
-      Plan Writer → Reflector → TodayCard
-
-    Returns a today_card JSON object.
+    Run the full Befit agent pipeline and return a today_card JSON object.
     """
     if not API_KEY:
         raise HTTPException(
@@ -111,12 +117,37 @@ async def scan_and_plan(body: ScanAndPlanRequest) -> TodayCard:
 
 
 # ---------------------------------------------------------------------------
-# Serve frontend static files (production convenience)
+# Frontend static file routes
+# Explicit named routes ensure correct MIME types; the StaticFiles mount
+# below serves everything else (favicons, images, etc.)
 # ---------------------------------------------------------------------------
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
-if os.path.isdir(FRONTEND_DIR):
-    app.mount("/app", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
-    @app.get("/")
+if os.path.isdir(FRONTEND_DIR):
+    logger.info("Serving frontend from %s", FRONTEND_DIR)
+
+    @app.get("/", include_in_schema=False)
     async def root():
         return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+    @app.get("/style.css", include_in_schema=False)
+    async def stylesheet():
+        return FileResponse(
+            os.path.join(FRONTEND_DIR, "style.css"),
+            media_type="text/css",
+        )
+
+    @app.get("/app.js", include_in_schema=False)
+    async def script():
+        return FileResponse(
+            os.path.join(FRONTEND_DIR, "app.js"),
+            media_type="application/javascript",
+        )
+
+    # Remaining static assets (fonts, images, etc.)
+    app.mount(
+        "/assets",
+        StaticFiles(directory=FRONTEND_DIR),
+        name="assets",
+    )
+else:
+    logger.warning("Frontend directory not found at %s", FRONTEND_DIR)

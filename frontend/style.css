@@ -10,9 +10,9 @@
   --color-bg:          #faf8f5;
   --color-surface:     #ffffff;
   --color-border:      #e8e0d8;
-  --color-primary:     #5c7a5f;   /* muted sage green */
+  --color-primary:     #5c7a5f;
   --color-primary-dk:  #3e5941;
-  --color-accent:      #d4845a;   /* warm terracotta */
+  --color-accent:      #d4845a;
   --color-text:        #2d2926;
   --color-muted:       #6b6560;
   --color-info-bg:     #eef4ef;
@@ -44,14 +44,9 @@ body {
 }
 
 /* ── Accessibility ── */
-.sr-only {
-  position: absolute; width: 1px; height: 1px;
-  padding: 0; margin: -1px; overflow: hidden;
-  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
-}
 :focus-visible { outline: 3px solid var(--color-accent); outline-offset: 2px; }
 
-/* ── Layout ── */
+/* ── Header ── */
 .app-header {
   background: var(--color-primary);
   color: #fff;
@@ -68,6 +63,7 @@ body {
 .logo { font-size: 1.4rem; font-weight: 700; letter-spacing: -.5px; }
 .tagline { font-size: .85rem; opacity: .85; }
 
+/* ── Main layout ── */
 .app-main {
   flex: 1;
   max-width: 640px;
@@ -135,13 +131,13 @@ body {
 
 .preview-img {
   width: 100%;
-  height: 100%;
+  max-height: 260px;
   object-fit: cover;
   border-radius: var(--radius-sm);
-  max-height: 260px;
+  display: block;
 }
 
-/* ── Query input ── */
+/* ── Query textarea ── */
 .query-input {
   width: 100%;
   border: 1px solid var(--color-border);
@@ -156,7 +152,7 @@ body {
 }
 .query-input:focus { border-color: var(--color-primary); outline: none; }
 
-/* ── Optional context ── */
+/* ── Context details ── */
 .context-details {
   margin-top: 1rem;
   border: 1px solid var(--color-border);
@@ -198,7 +194,7 @@ body {
   color: var(--color-text);
 }
 
-/* ── Buttons ── */
+/* ── Primary button ── */
 .btn-primary {
   display: flex;
   align-items: center;
@@ -220,6 +216,7 @@ body {
 .btn-primary:active:not(:disabled) { transform: scale(.98); }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 
+/* ── Secondary button ── */
 .btn-secondary {
   display: block;
   width: 100%;
@@ -257,7 +254,7 @@ body {
   color: #b22222;
 }
 
-/* ── Today card ── */
+/* ── Today's Plan card ── */
 .today-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -268,7 +265,6 @@ body {
   flex-direction: column;
   gap: 1.25rem;
 }
-
 .tc-header {
   border-bottom: 1px solid var(--color-border);
   padding-bottom: 1rem;
@@ -283,7 +279,6 @@ body {
   font-size: .95rem;
   color: var(--color-muted);
 }
-
 .tc-section-title {
   font-size: .95rem;
   font-weight: 700;
@@ -291,7 +286,7 @@ body {
   color: var(--color-primary-dk);
 }
 
-/* Chip list (detected items) */
+/* Chip list */
 .chip-list {
   list-style: none;
   display: flex;
@@ -306,7 +301,7 @@ body {
   font-size: .82rem;
   color: var(--color-primary-dk);
 }
-.chip-list li .chip-category {
+.chip-category {
   color: var(--color-muted);
   font-size: .75rem;
   margin-left: .3rem;
@@ -357,12 +352,10 @@ body {
 }
 .action-body { flex: 1; }
 .action-title { font-weight: 700; font-size: .93rem; margin-bottom: .2rem; }
-.action-desc { font-size: .875rem; color: var(--color-muted); }
+.action-desc  { font-size: .875rem; color: var(--color-muted); }
 
-/* Why section */
+/* Why / Limitations */
 .tc-why { font-size: .925rem; }
-
-/* Limitations */
 .tc-limitations {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -372,14 +365,9 @@ body {
   color: var(--color-muted);
   line-height: 1.55;
 }
-.tc-limitations::before {
-  content: "⚠️ ";
-}
+.tc-limitations p::before { content: "⚠️  "; }
 
-/* ── Utility ── */
-.hidden { display: none !important; }
-
-/* ── Responsive tweaks ── */
+/* ── Responsive ── */
 @media (max-width: 420px) {
   .context-grid { grid-template-columns: 1fr; }
   .context-grid .full-width { grid-column: 1; }

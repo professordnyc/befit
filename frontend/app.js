@@ -1,47 +1,42 @@
 /**
  * app.js – Befit frontend controller
  *
- * Handles:
- *   1. Image upload / camera capture → base-64 data URI
- *   2. Form state & validation
- *   3. POST /scan-and-plan → today_card JSON
- *   4. Rendering the TodayCard response into the UI
+ * Flow:
+ *   1. User picks / drags an image  → stored as base-64 data URI
+ *   2. User types a wellness question
+ *   3. Submit → POST /scan-and-plan → today_card JSON
+ *   4. Render card into DOM
  */
 
 'use strict';
 
-// ── Config ──────────────────────────────────────────────────────────────────
-const API_BASE = '';   // empty = same origin; set to 'http://localhost:8000' in dev
-const ENDPOINT = `${API_BASE}/scan-and-plan`;
-
 // ── DOM refs ────────────────────────────────────────────────────────────────
-const uploadArea      = document.getElementById('upload-area');
-const fileInput       = document.getElementById('file-input');
-const previewImg      = document.getElementById('preview-img');
+const uploadArea        = document.getElementById('upload-area');
+const fileInput         = document.getElementById('file-input');
+const previewImg        = document.getElementById('preview-img');
 const uploadPlaceholder = document.getElementById('upload-placeholder');
-const userQuery       = document.getElementById('user-query');
-const ctxGoal         = document.getElementById('ctx-goal');
-const ctxPerson       = document.getElementById('ctx-person');
-const ctxConstraints  = document.getElementById('ctx-constraints');
-const btnSubmit       = document.getElementById('btn-submit');
-const btnLabel        = document.getElementById('btn-label');
-const btnSpinner      = document.getElementById('btn-spinner');
-const errorBanner     = document.getElementById('error-banner');
-const todayCardEl     = document.getElementById('today-card');
-const btnReset        = document.getElementById('btn-reset');
+const userQuery         = document.getElementById('user-query');
+const ctxGoal           = document.getElementById('ctx-goal');
+const ctxPerson         = document.getElementById('ctx-person');
+const ctxConstraints    = document.getElementById('ctx-constraints');
+const btnSubmit         = document.getElementById('btn-submit');
+const btnLabel          = document.getElementById('btn-label');
+const btnSpinner        = document.getElementById('btn-spinner');
+const errorBanner       = document.getElementById('error-banner');
+const todayCardEl       = document.getElementById('today-card');
+const btnReset          = document.getElementById('btn-reset');
 
-// TodayCard inner elements
-const tcGoal          = document.getElementById('tc-goal');
-const tcItems         = document.getElementById('tc-items');
-const tcFlags         = document.getElementById('tc-flags');
-const tcActions       = document.getElementById('tc-actions');
-const tcWhy           = document.getElementById('tc-why');
-const tcLimitations   = document.getElementById('tc-limitations');
-const tcItemsSection  = document.getElementById('tc-items-section');
-const tcFlagsSection  = document.getElementById('tc-flags-section');
+const tcGoal         = document.getElementById('tc-goal');
+const tcItems        = document.getElementById('tc-items');
+const tcFlags        = document.getElementById('tc-flags');
+const tcActions      = document.getElementById('tc-actions');
+const tcWhy          = document.getElementById('tc-why');
+const tcLimitations  = document.getElementById('tc-limitations');
+const tcItemsSection = document.getElementById('tc-items-section');
+const tcFlagsSection = document.getElementById('tc-flags-section');
 
-// ── State ───────────────────────────────────────────────────────────────────
-let imageDataUri = null;   // base-64 data URI of the chosen image
+// ── State ────────────────────────────────────────────────────────────────────
+let imageDataUri = null;
 
 // ── Image selection ──────────────────────────────────────────────────────────
 uploadArea.addEventListener('click', () => fileInput.click());
@@ -56,8 +51,8 @@ fileInput.addEventListener('change', () => {
   reader.onload = (e) => {
     imageDataUri = e.target.result;
     previewImg.src = imageDataUri;
-    previewImg.classList.remove('hidden');
-    uploadPlaceholder.classList.add('hidden');
+    previewImg.style.display = 'block';
+    uploadPlaceholder.style.display = 'none';
     updateSubmitState();
   };
   reader.readAsDataURL(file);
@@ -76,21 +71,22 @@ uploadArea.addEventListener('drop', (e) => {
   uploadArea.style.borderColor = '';
   const file = e.dataTransfer.files[0];
   if (file && file.type.startsWith('image/')) {
-    fileInput.files = e.dataTransfer.files;
+    // Assign to input and trigger change handler
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
     fileInput.dispatchEvent(new Event('change'));
   }
 });
 
-// ── Submit gating ────────────────────────────────────────────────────────────
+// ── Enable submit only when both image and query are present ─────────────────
 userQuery.addEventListener('input', updateSubmitState);
 
 function updateSubmitState() {
-  const hasImage = !!imageDataUri;
-  const hasQuery = userQuery.value.trim().length > 0;
-  btnSubmit.disabled = !(hasImage && hasQuery);
+  btnSubmit.disabled = !(imageDataUri && userQuery.value.trim().length > 0);
 }
 
-// ── Submit ───────────────────────────────────────────────────────────────────
+// ── Submit ────────────────────────────────────────────────────────────────────
 btnSubmit.addEventListener('click', async () => {
   if (btnSubmit.disabled) return;
   await runPipeline();
@@ -99,32 +95,32 @@ btnSubmit.addEventListener('click', async () => {
 async function runPipeline() {
   setLoading(true);
   hideError();
-  todayCardEl.classList.add('hidden');
+  todayCardEl.style.display = 'none';
 
-  // Build optional context object
   const userContext = buildContext();
 
   const body = {
-    image_url: imageDataUri,
-    user_query: userQuery.value.trim(),
+    image_url:    imageDataUri,
+    user_query:   userQuery.value.trim(),
     user_context: userContext,
   };
 
   try {
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
+    const res = await fetch('/scan-and-plan', {
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body:    JSON.stringify(body),
     });
 
     if (!res.ok) {
-      const detail = await res.text();
+      let detail = '';
+      try { detail = (await res.json()).detail; } catch { detail = await res.text(); }
       throw new Error(`Server error ${res.status}: ${detail}`);
     }
 
     const card = await res.json();
     renderCard(card);
-    todayCardEl.classList.remove('hidden');
+    todayCardEl.style.display = 'flex';
     todayCardEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (err) {
     showError(err.message || 'Something went wrong. Please try again.');
@@ -137,17 +133,20 @@ function buildContext() {
   const goal        = ctxGoal.value.trim();
   const person      = ctxPerson.value.trim();
   const rawConst    = ctxConstraints.value.trim();
-  const constraints = rawConst ? rawConst.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const constraints = rawConst
+    ? rawConst.split(',').map(s => s.trim()).filter(Boolean)
+    : [];
 
   if (!goal && !person && !constraints.length) return null;
-  return {
-    ...(goal        ? { goal }        : {}),
-    ...(person      ? { person }      : {}),
-    ...(constraints.length ? { constraints } : {}),
-  };
+  return Object.assign(
+    {},
+    goal        ? { goal }        : {},
+    person      ? { person }      : {},
+    constraints.length ? { constraints } : {},
+  );
 }
 
-// ── Render TodayCard ─────────────────────────────────────────────────────────
+// ── Render TodayCard ──────────────────────────────────────────────────────────
 function renderCard(card) {
   // Goal summary
   tcGoal.textContent = card.goal_summary || '';
@@ -155,30 +154,37 @@ function renderCard(card) {
   // Detected items
   tcItems.innerHTML = '';
   if (card.items_detected && card.items_detected.length) {
-    tcItemsSection.classList.remove('hidden');
+    tcItemsSection.style.display = '';
     card.items_detected.forEach(item => {
       const li = document.createElement('li');
-      li.innerHTML = `${escHtml(item.name)}<span class="chip-category">${escHtml(item.category)}</span>`;
+      li.innerHTML =
+        esc(item.name) +
+        (item.category
+          ? `<span class="chip-category">${esc(item.category)}</span>`
+          : '');
       if (item.notes) li.title = item.notes;
       tcItems.appendChild(li);
     });
   } else {
-    tcItemsSection.classList.add('hidden');
+    tcItemsSection.style.display = 'none';
   }
 
-  // Risk flags
+  // Risk flags – always show warnings/cautions; show info only when few flags
   tcFlags.innerHTML = '';
-  const visibleFlags = (card.risk_flags || []).filter(f => f.level !== 'info' || card.risk_flags.length <= 2);
+  const flags = card.risk_flags || [];
+  const showInfo = flags.length <= 3;
+  const visibleFlags = flags.filter(f => f.level !== 'info' || showInfo);
+
   if (visibleFlags.length) {
-    tcFlagsSection.classList.remove('hidden');
+    tcFlagsSection.style.display = '';
     visibleFlags.forEach(flag => {
       const li = document.createElement('li');
-      li.className = `flag-item flag-${escHtml(flag.level)}`;
+      li.className = `flag-item flag-${esc(flag.level)}`;
       li.textContent = flag.message;
       tcFlags.appendChild(li);
     });
   } else {
-    tcFlagsSection.classList.add('hidden');
+    tcFlagsSection.style.display = 'none';
   }
 
   // Actions
@@ -189,8 +195,8 @@ function renderCard(card) {
     li.innerHTML = `
       <div class="action-number" aria-hidden="true">${i + 1}</div>
       <div class="action-body">
-        <div class="action-title">${escHtml(action.title)}</div>
-        <div class="action-desc">${escHtml(action.description)}</div>
+        <div class="action-title">${esc(action.title)}</div>
+        <div class="action-desc">${esc(action.description)}</div>
       </div>`;
     tcActions.appendChild(li);
   });
@@ -202,40 +208,40 @@ function renderCard(card) {
   tcLimitations.textContent = card.limitations || '';
 }
 
-// ── Reset ────────────────────────────────────────────────────────────────────
+// ── Reset ─────────────────────────────────────────────────────────────────────
 btnReset.addEventListener('click', () => {
   imageDataUri = null;
   fileInput.value = '';
   previewImg.src = '';
-  previewImg.classList.add('hidden');
-  uploadPlaceholder.classList.remove('hidden');
+  previewImg.style.display = 'none';
+  uploadPlaceholder.style.display = '';
   userQuery.value = '';
   ctxGoal.value = '';
   ctxPerson.value = '';
   ctxConstraints.value = '';
-  todayCardEl.classList.add('hidden');
+  todayCardEl.style.display = 'none';
   hideError();
   updateSubmitState();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-// ── UI helpers ───────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function setLoading(on) {
   btnSubmit.disabled = on;
-  btnLabel.textContent = on ? 'Analysing…' : 'Get My Today\'s Plan';
-  btnSpinner.classList.toggle('hidden', !on);
+  btnLabel.textContent = on ? 'Analysing…' : "Get My Today's Plan";
+  btnSpinner.style.display = on ? 'inline-block' : 'none';
 }
 
 function showError(msg) {
-  errorBanner.textContent = `⚠️  ${msg}`;
-  errorBanner.classList.remove('hidden');
+  errorBanner.textContent = '⚠️  ' + msg;
+  errorBanner.style.display = '';
 }
 function hideError() {
   errorBanner.textContent = '';
-  errorBanner.classList.add('hidden');
+  errorBanner.style.display = 'none';
 }
 
-function escHtml(str) {
+function esc(str) {
   return String(str ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
