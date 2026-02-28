@@ -1,0 +1,41 @@
+version: "1.0.0"
+title: "Befit Scan and Plan"
+description: >
+  Scan a live video frame or photo of a pantry/medicine cabinet and generate a
+  safe, simple wellness plan for today using Befit agents.
+
+instructions: >
+  Use the Befit Planner and its sub-agents as defined in AGENTS.md.
+  Respect LIMITATIONS.md and RISK_LOG.md. Produce a single Today’s Plan card
+  as structured JSON.
+
+inputs:
+  - key: image_path
+    input_type: string
+    requirement: required
+    description: "Path or URL to a captured frame/photo."
+  - key: user_query
+    input_type: string
+    requirement: required
+    description: "User's natural language question (from voice or text)."
+  - key: user_context
+    input_type: string
+    requirement: optional
+    description: "Optional JSON with goal, person type, constraints."
+
+prompt: |
+  Run the Befit scan-and-plan workflow:
+
+  1. Load context from AGENTS.md, .goosehints, RISK_LOG.md, and LIMITATIONS.md.
+  2. Use the Vision Interpreter to extract structured items from {{ image_path }}.
+  3. Use the Context Interpreter to parse {{ user_query }} and {{ user_context }}.
+  4. Use the Risk Checker to generate simple risk flags.
+  5. Use the Plan Writer to draft a Today’s Plan card.
+  6. Use the Reflector to review and refine the card for safety and clarity.
+  7. Return only a JSON object with:
+     - items_detected
+     - goal_summary
+     - risk_flags
+     - actions
+     - why
+     - limitations

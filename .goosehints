@@ -1,0 +1,47 @@
+# .goosehints – Befit
+
+# High-level guidance for Goose when working in this repository.
+
+project:
+  name: Befit
+  description: >
+    A Goose-powered, multimodal wellness assistant that helps women and caregivers
+    turn what they have at home into simple, safe daily actions.
+
+entry_points:
+  - AGENTS.md
+  - skills/ # if applicable 
+  - befit_scan_and_plan.yaml # recipe for scanning pantry/med cabinet and generating a wellness plan
+  - DECISIONS.md
+  - RISK_LOG.md
+  - EVIDENCE_LOG.md
+  - LIMITATIONS.md
+
+preferences:
+  # Always understand the agent team before proposing workflows.
+  - "Read AGENTS.md before designing or modifying agent orchestration."
+  - "Prefer using existing recipes (YAML files) and where relevant skills in the skills/ directory over ad-hoc prompting."
+  - "Respect and consult RISK_LOG.md and any LIMITATIONS.md when generating health-related outputs."
+
+logging_and_docs:
+  - "When asked to update documentation, prefer appending to existing logs (RISK_LOG.md, EVIDENCE_LOG.md, DECISIONS.md) rather than rewriting history."
+  - "When proposing code changes that affect agents, recipes or skills, also suggest updates to AGENTS.md, recipes and related SKILL.md files."
+
+safety:
+  - "Do not generate medical diagnoses or dosing instructions."
+  - "Always include clear disclaimers and limitations for user-facing wellness guidance."
+  - "When uncertain about safety, recommend consulting a qualified healthcare professional."
+
+skills:
+  # Hints about important skills to use first.
+  - "For image or live video frame understanding and pantry/med cabinet analysis, use Befit perception-related skills in skills/befit-* before inventing new workflows."
+  - "For updating logs and evidence, use dev-logging skills if present instead of writing free-form notes."
+
+agents:
+  # Hints about collaboration style.
+  - "Use the Befit Planner agent to coordinate sub-agents (Vision Interpreter, Context Interpreter, Risk Checker, Plan Writer, Reflector) in a hierarchical fashion."
+  - "Apply reflection as a distinct step before finalizing user-facing outputs."
+
+mcp:
+  # Future MCP App and MCP tool integration.
+  - "If MCP tools or MCP Apps are present, prefer using them via established skills or recipes rather than direct, undocumented calls."
