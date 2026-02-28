@@ -31,6 +31,7 @@ The Planner is responsible for:
   - Call the Risk Checker to evaluate potential concerns.
   - Call the Plan Writer to create the “Today’s Plan” or “Today’s Answer” card.
   - Call the Reflector for safety and quality review.
+- Planner is responsible for coordinating speech input (STT) and optional audio output (TTS) as part of the scan-and-plan flow.
 - Respect global health limitations and disclaimers (no diagnoses, no dosing, no emergency guidance).
 
 **Constraints:**
@@ -46,6 +47,7 @@ The Planner is responsible for:
 
 **Responsibilities:**
 - Use multimodal models to identify items in fridges, pantries, and medicine cabinets at a “good enough” level.
+- Take in uploaded or live video frame and and mobile camera input.
 - Produce a structured list of items with:
   - Name (e.g., "canned tomato soup", "ibuprofen bottle").
   - Category (e.g., "canned soup", "NSAID", "sugary drink", "whole grain").

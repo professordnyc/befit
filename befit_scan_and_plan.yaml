@@ -7,7 +7,8 @@ description: >
 instructions: >
   Use the Befit Planner and its sub-agents as defined in AGENTS.md.
   Respect LIMITATIONS.md and RISK_LOG.md. Produce a single Today’s Plan card
-  as structured JSON.
+  as structured JSON. 
+  This recipe is used by a responsive web app with voice input and optional audio output.
 
 inputs:
   - key: image_path

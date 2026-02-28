@@ -13,9 +13,14 @@ it into a simple "Today’s Plan" of safe, achievable actions.
 - Storage: Simple hosted database or Convex for logs and sample runs
 - Deployment: Render/Netlify (to be finalized)
 
-No login or user accounts are required.
+## Key Features 
 
-## Today's Plan response shape
+- No login or user accounts are required.
+- Multimodal features include TTS, STT, reasoning over image or live frame, with text and image fallback
+- Deployed, browser-based, responsive web app.
+- Voice in / audio out as first-class goals.
+- Accessibility expectations (mobile-first, large touch targets, clear contrast, screen-reader friendly).
+
 ## Today’s Plan response shape
 
 The backend returns a JSON object called `today_card` with:

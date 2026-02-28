@@ -18,4 +18,8 @@ This document describes what Befit does **not** do and important safety constrai
 - No access to personal medical records unless explicitly integrated and documented.
 - No long-term tracking beyond this device/session unless clearly explained.
 
-    
+## Modality limitations
+
+- Speech recognition may mishear names or quantities; users should verify transcriptions.
+- Visual analysis is based only on visible labels/packaging in the frame.
+- Audio output is for convenience only and does not change the non-medical nature of guidance.

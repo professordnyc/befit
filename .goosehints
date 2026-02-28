@@ -42,6 +42,10 @@ agents:
   - "Use the Befit Planner agent to coordinate sub-agents (Vision Interpreter, Context Interpreter, Risk Checker, Plan Writer, Reflector) in a hierarchical fashion."
   - "Apply reflection as a distinct step before finalizing user-facing outputs."
 
+ux: 
+  # Hints about user interaction and accessibility.
+  - "Design Befit as a responsive, mobile-first web app with accessible UI (large tap targets, clear contrast, screen-reader-friendly markup)."
+  - “Prefer voice-first interaction (mic button, STT, optional TTS) with photo/upload as fallback.”
 mcp:
   # Future MCP App and MCP tool integration.
   - "If MCP tools or MCP Apps are present, prefer using them via established skills or recipes rather than direct, undocumented calls."
