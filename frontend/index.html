@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Befit – Your Today's Plan</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ── Header ── -->
+  <header class="app-header">
+    <div class="header-inner">
+      <span class="logo">🌿 Befit</span>
+      <span class="tagline">Wellness from what you already have</span>
+    </div>
+  </header>
+
+  <main class="app-main">
+
+    <!-- ── Step 1 – Upload / Capture ── -->
+    <section class="card" id="section-upload">
+      <h2 class="card-title">1. Show us your pantry, fridge, or medicine cabinet</h2>
+
+      <div class="upload-area" id="upload-area" role="button" tabindex="0"
+           aria-label="Click or tap to choose an image">
+        <img id="preview-img" class="preview-img hidden" alt="Your uploaded image preview" />
+        <div id="upload-placeholder" class="upload-placeholder">
+          <span class="upload-icon">📷</span>
+          <p>Tap to take a photo or upload an image</p>
+        </div>
+      </div>
+      <input type="file" id="file-input" accept="image/*" capture="environment" class="sr-only" />
+    </section>
+
+    <!-- ── Step 2 – Question ── -->
+    <section class="card" id="section-query">
+      <h2 class="card-title">2. What would you like help with today?</h2>
+      <textarea
+        id="user-query"
+        class="query-input"
+        rows="3"
+        placeholder="e.g. "I want to support my blood pressure" or "What's a quick healthy lunch from what I have?""
+        aria-label="Your wellness question"
+      ></textarea>
+
+      <!-- Optional context toggles -->
+      <details class="context-details">
+        <summary>Add context (optional)</summary>
+        <div class="context-grid">
+          <label>
+            Goal
+            <select id="ctx-goal" class="ctx-select">
+              <option value="">— choose —</option>
+              <option value="blood pressure">Blood pressure</option>
+              <option value="energy">Energy</option>
+              <option value="weight management">Weight management</option>
+              <option value="general health">General health</option>
+            </select>
+          </label>
+          <label>
+            This plan is for
+            <select id="ctx-person" class="ctx-select">
+              <option value="">— choose —</option>
+              <option value="self">Myself</option>
+              <option value="elder">An elder I care for</option>
+              <option value="family">My family</option>
+            </select>
+          </label>
+          <label class="full-width">
+            Dietary constraints (comma-separated)
+            <input type="text" id="ctx-constraints" class="ctx-input"
+                   placeholder="e.g. vegetarian, low-sodium, nut allergy" />
+          </label>
+        </div>
+      </details>
+    </section>
+
+    <!-- ── Submit ── -->
+    <button id="btn-submit" class="btn-primary" disabled>
+      <span id="btn-label">Get My Today's Plan</span>
+      <span id="btn-spinner" class="spinner hidden" aria-hidden="true"></span>
+    </button>
+
+    <!-- ── Error banner ── -->
+    <div id="error-banner" class="error-banner hidden" role="alert"></div>
+
+    <!-- ── Today's Plan card ── -->
+    <section id="today-card" class="today-card hidden" aria-live="polite">
+
+      <header class="tc-header">
+        <h2 class="tc-title">🌟 Today's Plan</h2>
+        <p id="tc-goal" class="tc-goal"></p>
+      </header>
+
+      <!-- Detected items -->
+      <div class="tc-section" id="tc-items-section">
+        <h3 class="tc-section-title">🛒 Items we noticed</h3>
+        <ul id="tc-items" class="chip-list"></ul>
+      </div>
+
+      <!-- Risk flags -->
+      <div class="tc-section" id="tc-flags-section">
+        <h3 class="tc-section-title">🔍 Things to be aware of</h3>
+        <ul id="tc-flags" class="flag-list"></ul>
+      </div>
+
+      <!-- Actions -->
+      <div class="tc-section">
+        <h3 class="tc-section-title">✅ Your micro-actions for today</h3>
+        <ol id="tc-actions" class="action-list"></ol>
+      </div>
+
+      <!-- Why -->
+      <div class="tc-section tc-why">
+        <h3 class="tc-section-title">💡 Why this matters</h3>
+        <p id="tc-why"></p>
+      </div>
+
+      <!-- Limitations -->
+      <div class="tc-section tc-limitations">
+        <p id="tc-limitations"></p>
+      </div>
+
+      <!-- Start over -->
+      <button class="btn-secondary" id="btn-reset">Start a new scan</button>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <p>Befit is not a medical tool. Always consult a qualified healthcare professional for personalised advice.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
