@@ -82,10 +82,6 @@ let recognition = null;
 let isListening = false;
 let alwaysOn    = false;
 
-// ── TTS command listener state ────────────────────────────────────────────────
-let cmdRecognition = null;
-let cmdListening   = false;
-
 // ── TTS playback state ────────────────────────────────────────────────────────
 /** @type {HTMLAudioElement|null} */
 let ttsAudio    = null;
@@ -418,6 +414,7 @@ function initSpeech() {
   recognition.onend   = () => {
     isListening = false;
     updateMicUI();
+    if (ttsListening) { ttsListening = false; setTimeout(startCmdListener, 200); return; }
     if (alwaysOn) setTimeout(() => { if (alwaysOn) startListening(); }, 300);
   };
   recognition.onerror = (event) => {
@@ -426,6 +423,19 @@ function initSpeech() {
     if (event.error !== 'no-speech') showMicError(event.error || 'Microphone error. Please try again.');
   };
   recognition.onresult = (event) => {
+    const last = event.results[event.results.length - 1];
+    if (ttsListening) {
+      if (!last.isFinal) return;
+      const cmd = last[0].transcript.toLowerCase().replace(/[^a-z ]/g, '').trim();
+      if      (cmd === 'play' || cmd === 'start') ttsPlay();
+      else if (cmd === 'pause')                   ttsPause();
+      else if (cmd === 'stop')                    ttsStop();
+      else if (cmd === 'restart')                 ttsRestart();
+      // Re-arm for next command if audio still active
+      ttsListening = false;
+      if (ttsAudio && !ttsAudio.ended) setTimeout(startCmdListener, 200);
+      return;
+    }
     finalTranscript = interimTranscript = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const r = event.results[i];
@@ -433,7 +443,7 @@ function initSpeech() {
       else           interimTranscript += r[0].transcript;
     }
     userQuery.value = finalTranscript + interimTranscript;
-    if (event.results[event.results.length - 1].isFinal) {
+    if (last.isFinal) {
       interimTranscript = '';
       userQuery.value   = finalTranscript.trim();
       updateSubmitState();
@@ -441,43 +451,21 @@ function initSpeech() {
     }
   };
 
-  // ── TTS voice command mic (dedicated continuous session) ──────────────────
-  cmdRecognition = new SpeechRecognition();
-  cmdRecognition.continuous     = true;
-  cmdRecognition.interimResults = false;
-  cmdRecognition.lang           = 'en-US';
-
-  cmdRecognition.onstart = () => { cmdListening = true; };
-  cmdRecognition.onend   = () => {
-    cmdListening = false;
-    if (ttsAudio && !ttsAudio.ended)
-      setTimeout(() => { if (ttsAudio && !ttsAudio.ended) startCmdListener(); }, 150);
-  };
-  cmdRecognition.onerror = (event) => {
-    cmdListening = false;
-    if (ttsAudio && !ttsAudio.ended && event.error !== 'aborted')
-      setTimeout(() => startCmdListener(), 300);
-  };
-  cmdRecognition.onresult = (event) => {
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      if (!event.results[i].isFinal) continue;
-      const cmd = event.results[i][0].transcript.toLowerCase().replace(/[^a-z ]/g, '').trim();
-      if (cmd === 'play' || cmd === 'start') { ttsPlay();    break; }
-      if (cmd === 'pause')                   { ttsPause();   break; }
-      if (cmd === 'stop')                    { ttsStop();    break; }
-      if (cmd === 'restart')                 { ttsRestart(); break; }
-    }
-  };
 }
+
+// ttsListening=true routes recognition.onresult to TTS commands, not query textarea.
+let ttsListening = false;
 
 function startCmdListener() {
-  if (!cmdRecognition || cmdListening) return;
-  try { cmdRecognition.start(); } catch (_) { /* already running */ }
+  if (!recognition || ttsListening) return;
+  ttsListening = true;
+  stopListening();
+  try { recognition.start(); } catch (_) { /* ignore */ }
 }
+
 function stopCmdListener() {
-  if (!cmdRecognition) return;
-  try { cmdRecognition.stop(); } catch (_) { /* ignore */ }
-  cmdListening = false;
+  ttsListening = false;
+  stopListening();
 }
 
 // ── Mic button / always-on toggle ─────────────────────────────────────────────
