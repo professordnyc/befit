@@ -156,9 +156,11 @@ while keeping the system debuggable and safe for a wellness-oriented, non-diagno
 
 ## Audio Output (TTS)
 - The Planner coordinates ElevenLabs TTS audio output as part of the scan-and-plan flow via `POST /tts`.
-- A dedicated continuous `SpeechRecognition` session (`cmdRecognition`) handles voice commands
-  ("play", "start", "pause", "stop", "restart") during playback. It is independent of the query
-  mic so commands never appear in the query textarea.
+- A **single** `SpeechRecognition` instance handles both query input and TTS voice commands,
+  mode-switched by a `ttsListening` boolean. This avoids Chromium's silent failure when two
+  recognition instances compete for the mic.
+- Supported voice commands during playback: **listen** (from beginning), **play** (resume),
+  **pause**, **stop**. The player bar shows *"Say: listen • play • pause • stop"* as a hint.
 - The `ELEVENLABS_API_KEY` is server-side only and never exposed to the browser.
 - Auto-plays when the plan card renders; tears down cleanly on both reset buttons.
 

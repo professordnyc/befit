@@ -179,3 +179,39 @@ A self-contained `/camera-test` page was added to diagnose camera and microphone
 issues. It tested `getUserMedia` (video + audio), device enumeration, track state, and a live
 `SpeechRecognition` round-trip. Confirmed working; route and file removed after testing.
 `backend/main.py` route and `frontend/camera-test.html` both deleted before final commit.
+
+### Fix: TTS voice commands broken after camera permission grant
+
+**Problem:** The TTS command listener used a second `SpeechRecognition` instance
+(`cmdRecognition`, `continuous: true`). Chromium will not run two recognition
+instances concurrently — they share the same mic resource. When `ttsAudio.onplay`
+called `cmdRecognition.start()`, Chromium silently blocked it because the query-mic
+instance (`recognition`) had not fully released the mic. No error was raised; voice
+commands simply never fired.
+
+**Fix:** Removed `cmdRecognition` entirely. The single `recognition` instance is
+now mode-switched by a `ttsListening` boolean:
+- `ttsListening = false` → `onresult` routes to query textarea (normal input).
+- `ttsListening = true`  → `onresult` routes to TTS command dispatch.
+- `startCmdListener()` sets `ttsListening = true`, stops the query mic, then starts `recognition`.
+- After each command the listener re-arms itself while audio is still active.
+- `stopCmdListener()` clears the flag and stops recognition.
+
+**File changed:** `frontend/app.js` — state declarations, `initSpeech`,
+`startCmdListener`, `stopCmdListener`, `recognition.onresult`, `recognition.onend`.
+
+### Feature: TTS player bar UI clarity + "listen" voice command
+
+**Problem:** The UI gave no indication of which words could be spoken to control
+playback, and the "Restart" button label did not match any intuitive spoken command.
+
+**Changes:**
+- `btn-tts-play` (resume): label → **Play**, icon → ▶️, aria-label includes *"say: play"*.
+- `btn-tts-restart` (from beginning): label → **Listen**, class → `tts-btn--listen`
+  (accent colour), aria-label includes *"say: listen"*.
+- Pause / Stop aria-labels include *"say: pause"* / *"say: stop"*.
+- Added `.tts-voice-hint` span: *"Say: listen • play • pause • stop"* always visible
+  in the player bar; hidden on screens ≤ 420 px.
+- Voice command `'listen'` (and legacy `'restart'`) both trigger `ttsRestart()`.
+
+**Files changed:** `frontend/index.html`, `frontend/app.js`, `frontend/style.css`.
