@@ -137,6 +137,34 @@ body {
   display: block;
 }
 
+/* ── Query section header row ── */
+.query-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  margin-bottom: .75rem;
+}
+.query-header .card-title {
+  margin-bottom: 0;
+}
+.btn-reset-query {
+  flex-shrink: 0;
+  padding: .35rem .75rem;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: transparent;
+  border: 1.5px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+  white-space: nowrap;
+}
+.btn-reset-query:hover { background: var(--color-info-bg); }
+.btn-reset-query:active { transform: scale(.97); }
+
+
 /* ── Query textarea ── */
 .query-input {
   width: 100%;

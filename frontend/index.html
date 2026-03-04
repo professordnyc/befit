@@ -40,7 +40,11 @@
 
     <!-- ── Step 2 – Question ── -->
     <section class="card" id="section-query">
-      <h2 class="card-title">2. What would you like help with today?</h2>
+      <div class="query-header">
+        <h2 class="card-title">2. What would you like help with today?</h2>
+        <button id="btn-reset-query" class="btn-reset-query" type="button"
+                aria-label="Reset question and context fields">&#x21BA; Reset</button>
+      </div>
       <textarea
         id="user-query"
         class="query-input"

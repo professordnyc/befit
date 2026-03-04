@@ -25,6 +25,7 @@ const btnSpinner        = document.getElementById('btn-spinner');
 const errorBanner       = document.getElementById('error-banner');
 const todayCardEl       = document.getElementById('today-card');
 const btnReset          = document.getElementById('btn-reset');
+const btnResetQuery     = document.getElementById('btn-reset-query');
 
 const tcGoal         = document.getElementById('tc-goal');
 const tcItems        = document.getElementById('tc-items');
@@ -208,6 +209,18 @@ function renderCard(card) {
   tcLimitations.textContent = card.limitations || '';
 }
 
+// ── Reset query & context fields only ───────────────────────────────────────
+btnResetQuery.addEventListener('click', () => {
+  userQuery.value = '';
+  ctxGoal.value = '';
+  ctxPerson.value = '';
+  ctxConstraints.value = '';
+  hideError();
+  updateSubmitState();
+  userQuery.focus();
+});
+
+
 // ── Reset ─────────────────────────────────────────────────────────────────────
 btnReset.addEventListener('click', () => {
   imageDataUri = null;
@@ -228,7 +241,7 @@ btnReset.addEventListener('click', () => {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function setLoading(on) {
   btnSubmit.disabled = on;
-  btnLabel.textContent = on ? 'Analysing…' : "Get My Today's Plan";
+  btnLabel.textContent = on ? 'Analyzing…' : "Get Today's Plan";
   btnSpinner.style.display = on ? 'inline-block' : 'none';
 }
 
