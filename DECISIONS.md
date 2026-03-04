@@ -215,7 +215,7 @@ playback, and the "Restart" button label did not match any intuitive spoken comm
 - Voice command `'listen'` (and legacy `'restart'`) both trigger `ttsRestart()`.
 
 **Files changed:** `frontend/index.html`, `frontend/app.js`, `frontend/style.css`.
-## 2026-03-07
+## 2026-03-04
 
 ### Feature: Auto-capture toggle for live camera
 
