@@ -215,3 +215,60 @@ playback, and the "Restart" button label did not match any intuitive spoken comm
 - Voice command `'listen'` (and legacy `'restart'`) both trigger `ttsRestart()`.
 
 **Files changed:** `frontend/index.html`, `frontend/app.js`, `frontend/style.css`.
+## 2026-03-07
+
+### Feature: Auto-capture toggle for live camera
+
+**Rationale:** Users needed a choice between manual capture (tap Capture button) and automatic
+frame capture (hands-free). Caregivers and users holding items benefit from auto-capture.
+
+**Changes (2 files, frontend only — backend unchanged):**
+
+- `frontend/index.html` – Added `.upload-header` row containing the card title and a new
+  "Auto-capture" toggle (`#toggle-auto-capture`) using the existing toggle design system.
+  The toggle is positioned top-right of the camera section heading.
+
+- `frontend/app.js` – Added auto-capture module:
+  - `autoCapture` boolean mirrors the toggle state.
+  - `startAutoCountdown()` – 3-second setInterval countdown; updates the camera hint pill
+    (`#camera-hint`) each second ("Auto-capture in 3s…", "…2s…", "…1s…") then calls
+    `captureFrame()`. Countdown resets whenever the camera restarts.
+  - `cancelAutoCountdown()` – clears the interval and resets the hint text.
+  - `toggleAutoCapture` change listener – enables/disables auto mode; hides the manual
+    Capture button in auto mode; starts countdown immediately if camera is live.
+  - Manual capture (`captureFrame`) and file upload both call `cancelAutoCountdown()` to
+    prevent a race condition between user action and timer.
+  - Full reset calls `initCamera()` which respects the current `autoCapture` state.
+
+**No new packages, no backend changes, no API key changes.**
+
+### Feature: WebSpeech API TTS fallback
+
+**Rationale:** ElevenLabs credits can be exhausted; the app should remain fully functional
+(including audio readout) without requiring an API key. WebSpeech API (`window.speechSynthesis`)
+is available in all modern browsers at no cost.
+
+**Trigger condition:** `POST /tts` returns HTTP 502 or 503 (ElevenLabs unavailable or key
+not configured). The browser detects this and silently switches to WebSpeech.
+
+**Changes (3 files):**
+
+- `frontend/app.js` – Added `ttsUsingWebSpeech` boolean flag and four WebSpeech helpers:
+  - `webSpeechPlay(text)` – creates `SpeechSynthesisUtterance`, wires `onstart/onend/onerror/
+    onpause/onresume` to the existing `updateTtsUI` state machine and `startCmdListener`.
+  - `webSpeechPause / webSpeechResume / webSpeechStop` – thin wrappers around
+    `speechSynthesis.pause/resume/cancel`.
+  - `ttsPlay` checks `res.status === 502 || 503` before throwing; on match it calls
+    `webSpeechPlay(ttsText)` and returns early.
+  - `ttsPause / ttsStop / ttsRestart / ttsReset` each branch on `ttsUsingWebSpeech` to
+    route to the correct backend.
+  - Voice commands re-arm correctly for both backends (`ttsAudio.ended` check extended
+    with `|| ttsUsingWebSpeech`).
+
+- `backend/main.py` – Updated `/tts` endpoint docstring to note the 503 → WebSpeech
+  fallback contract so future developers understand why the 503 is meaningful.
+
+- `.env.example` – Added `# ── TTS fallback` section documenting:
+  - Default behaviour (503 → browser WebSpeech, no config required).
+  - `FORCE_WEBSPEECH_TTS=false` placeholder for a future opt-in server flag.
+

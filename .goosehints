@@ -1,4 +1,4 @@
-# .goosehints – Befit
+# .goosehints - Befit
 
 # High-level guidance for Goose when working in this repository.
 
@@ -25,7 +25,7 @@ preferences:
   - Read DECISIONS.md to understand past decisions and rationale before proposing changes. Do not guess, Ask if unsure.
   - Prefer using existing recipes (YAML files) and where relevant skills in the skills/ directory over ad-hoc prompting.
   - Respect and consult RISK_LOG.md and any LIMITATIONS.md when generating health-related outputs.
-  - Run Befit locally with uvicorn (uv run uvicorn backend.main:app --reload); do not rely on platform‑specific scripts like start.bat.
+  - Run Befit locally with uvicorn (uv run uvicorn backend.main:app --reload); do not rely on platform-specific scripts like start.bat.
   - Remember to remove any temporary files or data generated during testing or troubleshooting to maintain a clean working environment.
 logging_and_docs:
   - When asked to update documentation, prefer appending to existing logs (RISK_LOG.md, EVIDENCE_LOG.md, DECISIONS.md) rather than rewriting history.
@@ -53,3 +53,17 @@ ux:
 mcp:
   # Future MCP App and MCP tool integration.
   - If MCP tools or MCP Apps are present, prefer using them via established skills or recipes rather than direct, undocumented calls.
+
+tts:
+  # TTS architecture notes.
+  - ElevenLabs is the primary TTS provider (POST /tts server-side proxy).
+  - When /tts returns 502 or 503, the browser automatically falls back to window.speechSynthesis (WebSpeech API).
+  - No server-side configuration is required for the fallback — it is purely client-side.
+  - See .env.example for the FORCE_WEBSPEECH_TTS placeholder.
+
+camera:
+  # Camera capture architecture notes.
+  - Manual capture (default): user taps the Capture button.
+  - Auto-capture (opt-in): toggle starts a 3-second countdown; hint pill updates each second.
+  - Both modes produce identical base-64 JPEG sent to /scan-and-plan.
+  - cancelAutoCountdown() must be called on retake, file upload, and full reset.

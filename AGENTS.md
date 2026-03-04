@@ -155,7 +155,9 @@ while keeping the system debuggable and safe for a wellness-oriented, non-diagno
 - Run Befit locally with uvicorn (`uv run uvicorn backend.main:app --reload`); do not rely on platform-specific scripts like start.bat.
 
 ## Audio Output (TTS)
-- The Planner coordinates ElevenLabs TTS audio output as part of the scan-and-plan flow via `POST /tts`.
+- The Planner coordinates TTS audio output as part of the scan-and-plan flow via `POST /tts`.
+- **Primary:** ElevenLabs (`eleven_turbo_v2`). **Fallback:** WebSpeech API (`window.speechSynthesis`)
+  activates automatically when `/tts` returns 502/503 (credits exhausted or key not set).
 - A **single** `SpeechRecognition` instance handles both query input and TTS voice commands,
   mode-switched by a `ttsListening` boolean. This avoids Chromium's silent failure when two
   recognition instances compete for the mic.
@@ -163,12 +165,17 @@ while keeping the system debuggable and safe for a wellness-oriented, non-diagno
   **pause**, **stop**. The player bar shows *"Say: listen • play • pause • stop"* as a hint.
 - The `ELEVENLABS_API_KEY` is server-side only and never exposed to the browser.
 - Auto-plays when the plan card renders; tears down cleanly on both reset buttons.
+- Voice command re-arming works correctly for both ElevenLabs and WebSpeech backends.
 
 
 ## Camera / Live Frame Capture
 - The Vision Interpreter accepts both file-uploaded images and frames captured from the live camera feed.
 - `initCamera()` starts automatically on page load, requesting the rear-facing camera (`facingMode: environment`).
-- The "Capture" button snapshots the live frame; the resulting base-64 JPEG is sent to `/scan-and-plan` identically to an uploaded file.
-- "Retake" restarts the camera stream so the user can reframe before capturing again.
+- **Manual mode (default):** The "Capture" button snapshots the live frame.
+- **Auto-capture mode:** An "Auto-capture" toggle in the camera section header starts a 3-second
+  countdown. The hint pill updates each second and `captureFrame()` fires automatically. The
+  manual Capture button is hidden while auto-capture is active.
+- Both modes produce an identical base-64 JPEG sent to `/scan-and-plan`.
+- "Retake" restarts the camera stream (and re-arms the countdown if auto-capture is on).
 - If camera access is denied or unavailable, a descriptive error is shown and the "Upload image" fallback remains accessible.
 - **Boot order:** `initCamera().then(initSpeech)` — speech recognition is initialised only after the camera `getUserMedia` promise resolves, preventing Chromium from silently invalidating the `SpeechRecognition` instance during permission grant.

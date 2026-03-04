@@ -20,14 +20,24 @@
 
     <!-- ── Step 1 – Live Camera / Upload ── -->
     <section class="card" id="section-upload">
-      <h2 class="card-title">1. Show us your pantry, fridge, or medicine cabinet</h2>
+      <div class="upload-header">
+        <h2 class="card-title">1. Show us your pantry, fridge, or medicine cabinet</h2>
+        <!-- Auto-capture toggle -->
+        <label class="toggle-label" id="auto-capture-toggle-label">
+          <input type="checkbox" id="toggle-auto-capture"
+                 role="switch"
+                 aria-label="Enable automatic frame capture" />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">Auto-capture</span>
+        </label>
+      </div>
 
       <!-- Live camera view (default) -->
       <div class="camera-container" id="camera-container">
         <video id="camera-feed" class="camera-feed" autoplay playsinline muted
                aria-label="Live camera feed – point at your pantry, fridge, or cabinet"></video>
         <div class="camera-overlay">
-          <span class="camera-hint">Point at your pantry, fridge, or cabinet</span>
+          <span class="camera-hint" id="camera-hint">Point at your pantry, fridge, or cabinet</span>
         </div>
         <div class="camera-controls">
           <button id="btn-capture" class="btn-capture" type="button" aria-label="Capture frame">

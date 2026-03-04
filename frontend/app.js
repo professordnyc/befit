@@ -3,21 +3,21 @@
  *
  * Flow:
  *   1. Camera feed starts on load; user points device at pantry/fridge/cabinet.
- *   2. "Capture" snaps a frame → base-64 data URI (same path as file upload).
- *      File upload ("Upload image") is always available as fallback.
+ *   2a. Manual mode (default): "Capture" button snaps a frame.
+ *   2b. Auto-capture mode: frame is captured automatically after a 3-second countdown.
+ *       Toggle "Auto-capture" to switch modes. Both paths produce an identical base-64
+ *       JPEG sent to /scan-and-plan.
  *   3. User types or speaks a wellness question.
  *   4. Submit → POST /scan-and-plan → today_card JSON.
- *   5. Render card; ElevenLabs TTS auto-reads the plan via POST /tts.
+ *   5. Render card; TTS reads plan via POST /tts (ElevenLabs) with WebSpeech fallback.
  *
  * TTS voice commands (spoken while audio plays/paused):
  *   "play"|"start" → play/resume  "pause" → pause
- *   "stop"         → stop/rewind  "restart" → re-fetch and play
+ *   "stop"         → stop/rewind  "listen"|"restart" → re-fetch and play
  *
- * Camera notes:
- *   - Requests rear-facing camera (facingMode: environment) on load.
- *   - Falls back gracefully if permission denied or no camera found.
- *   - "Switch camera" button shown only when multiple cameras are detected.
- *   - Stream is stopped after capture or full page reset.
+ * TTS fallback:
+ *   If POST /tts returns 502/503 (ElevenLabs credits exhausted or unconfigured),
+ *   the client falls back to window.speechSynthesis (WebSpeech API).
  */
 
 'use strict';
@@ -26,12 +26,14 @@
 const cameraContainer  = document.getElementById('camera-container');
 const cameraFeed       = document.getElementById('camera-feed');
 const cameraError      = document.getElementById('camera-error');
+const cameraHint       = document.getElementById('camera-hint');
 const btnCapture       = document.getElementById('btn-capture');
 const btnSwitchCam     = document.getElementById('btn-switch-cam');
 const previewContainer = document.getElementById('preview-container');
 const previewImg       = document.getElementById('preview-img');
 const btnRetake        = document.getElementById('btn-retake');
 const fileInput        = document.getElementById('file-input');
+const toggleAutoCapture = document.getElementById('toggle-auto-capture');
 
 const userQuery         = document.getElementById('user-query');
 const ctxGoal           = document.getElementById('ctx-goal');
@@ -73,9 +75,11 @@ const ttsStatus     = document.getElementById('tts-status');
 let imageDataUri = null;
 
 // ── Camera state ──────────────────────────────────────────────────────────────
-let cameraStream    = null;  // active MediaStream
-let cameraDevices   = [];    // all videoinput devices
-let cameraDeviceIdx = 0;     // index into cameraDevices
+let cameraStream    = null;
+let cameraDevices   = [];
+let cameraDeviceIdx = 0;
+let autoCapture     = false;      // mirrors toggle-auto-capture checkbox
+let autoCountdownId = null;       // setInterval handle for countdown
 
 // ── Query STT state ───────────────────────────────────────────────────────────
 let recognition = null;
@@ -87,6 +91,7 @@ let alwaysOn    = false;
 let ttsAudio    = null;
 let ttsText     = '';
 let ttsFetching = false;
+let ttsUsingWebSpeech = false;   // true when WebSpeech fallback is active
 
 // ── Camera ────────────────────────────────────────────────────────────────────
 function stopStream() {
@@ -96,8 +101,17 @@ function stopStream() {
   }
 }
 
+function cancelAutoCountdown() {
+  if (autoCountdownId !== null) {
+    clearInterval(autoCountdownId);
+    autoCountdownId = null;
+  }
+  cameraHint.textContent = 'Point at your pantry, fridge, or cabinet';
+}
+
 async function startCamera(deviceId) {
   stopStream();
+  cancelAutoCountdown();
   const constraints = {
     video: deviceId
       ? { deviceId: { exact: deviceId } }
@@ -109,6 +123,7 @@ async function startCamera(deviceId) {
     cameraFeed.srcObject = cameraStream;
     cameraContainer.style.display = '';
     cameraError.style.display = 'none';
+    if (autoCapture) startAutoCountdown();
   } catch (err) {
     showCameraError(err);
   }
@@ -139,6 +154,37 @@ async function initCamera() {
   await startCamera(cameraDevices[cameraDeviceIdx]?.deviceId);
 }
 
+// ── Auto-capture countdown ────────────────────────────────────────────────────
+const AUTO_CAPTURE_DELAY = 3; // seconds
+
+function startAutoCountdown() {
+  cancelAutoCountdown();
+  let remaining = AUTO_CAPTURE_DELAY;
+  cameraHint.textContent = `Auto-capture in ${remaining}s…`;
+  autoCountdownId = setInterval(() => {
+    remaining -= 1;
+    if (remaining > 0) {
+      cameraHint.textContent = `Auto-capture in ${remaining}s…`;
+    } else {
+      cancelAutoCountdown();
+      captureFrame();
+    }
+  }, 1000);
+}
+
+// ── Auto-capture toggle ───────────────────────────────────────────────────────
+toggleAutoCapture.addEventListener('change', () => {
+  autoCapture = toggleAutoCapture.checked;
+  btnCapture.style.display = autoCapture ? 'none' : '';
+  if (autoCapture && cameraStream) {
+    startAutoCountdown();
+  } else {
+    cancelAutoCountdown();
+    cameraHint.textContent = 'Point at your pantry, fridge, or cabinet';
+  }
+});
+
+// ── Manual capture ────────────────────────────────────────────────────────────
 function captureFrame() {
   if (!cameraStream) return;
   const canvas = document.createElement('canvas');
@@ -147,6 +193,7 @@ function captureFrame() {
   canvas.getContext('2d').drawImage(cameraFeed, 0, 0);
   imageDataUri = canvas.toDataURL('image/jpeg', 0.85);
   stopStream();
+  cancelAutoCountdown();
 
   previewImg.src = imageDataUri;
   cameraContainer.style.display = 'none';
@@ -180,6 +227,7 @@ fileInput.addEventListener('change', () => {
   reader.onload = (e) => {
     imageDataUri = e.target.result;
     stopStream();
+    cancelAutoCountdown();
     previewImg.src = imageDataUri;
     cameraContainer.style.display = 'none';
     previewContainer.style.display = '';
@@ -431,9 +479,8 @@ function initSpeech() {
       else if (cmd === 'play'   || cmd === 'start')  ttsPlay();
       else if (cmd === 'pause')                       ttsPause();
       else if (cmd === 'stop')                        ttsStop();
-      // Re-arm for next command if audio still active
       ttsListening = false;
-      if (ttsAudio && !ttsAudio.ended) setTimeout(startCmdListener, 200);
+      if ((ttsAudio && !ttsAudio.ended) || ttsUsingWebSpeech) setTimeout(startCmdListener, 200);
       return;
     }
     finalTranscript = interimTranscript = '';
@@ -450,7 +497,6 @@ function initSpeech() {
       hideMicError();
     }
   };
-
 }
 
 // ttsListening=true routes recognition.onresult to TTS commands, not query textarea.
@@ -493,9 +539,35 @@ function buildTtsScript(card) {
   return parts.join(' ');
 }
 
+// ── TTS – WebSpeech fallback ──────────────────────────────────────────────────
+function webSpeechPlay(text) {
+  if (!window.speechSynthesis) { updateTtsUI('idle'); ttsStatus.textContent = '⚠️ Audio unavailable'; return; }
+  window.speechSynthesis.cancel();
+  ttsUsingWebSpeech = true;
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = 'en-US';
+  utt.rate = 0.95;
+  utt.onstart  = () => { updateTtsUI('playing'); startCmdListener(); };
+  utt.onend    = () => { ttsUsingWebSpeech = false; updateTtsUI('idle');   stopCmdListener(); };
+  utt.onerror  = () => { ttsUsingWebSpeech = false; updateTtsUI('idle');   stopCmdListener(); };
+  utt.onpause  = () => { updateTtsUI('paused'); };
+  utt.onresume = () => { updateTtsUI('playing'); };
+  window.speechSynthesis.speak(utt);
+  updateTtsUI('loading');
+}
+
+function webSpeechPause()   { if (window.speechSynthesis?.speaking) window.speechSynthesis.pause(); }
+function webSpeechResume()  { if (window.speechSynthesis?.paused)   window.speechSynthesis.resume(); }
+function webSpeechStop()    { ttsUsingWebSpeech = false; window.speechSynthesis?.cancel(); stopCmdListener(); updateTtsUI('idle'); }
+
 // ── TTS – core ────────────────────────────────────────────────────────────────
 async function ttsPlay() {
   if (ttsFetching) return;
+
+  // Resume WebSpeech if paused
+  if (ttsUsingWebSpeech) { webSpeechResume(); return; }
+
+  // Resume HTMLAudio if paused
   if (ttsAudio && ttsAudio.paused && ttsAudio.currentSrc) {
     ttsAudio.play(); updateTtsUI('playing'); startCmdListener(); return;
   }
@@ -510,11 +582,20 @@ async function ttsPlay() {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ text: ttsText }),
     });
+
+    // ElevenLabs unavailable – fall back to WebSpeech
+    if (res.status === 502 || res.status === 503) {
+      console.info('ElevenLabs TTS unavailable (' + res.status + '), using WebSpeech fallback.');
+      webSpeechPlay(ttsText);
+      return;
+    }
+
     if (!res.ok) {
       let detail = '';
       try { detail = (await res.json()).detail; } catch (_) { detail = await res.text(); }
       throw new Error('TTS error ' + res.status + ': ' + detail);
     }
+
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);
     if (ttsAudio) { ttsAudio.pause(); URL.revokeObjectURL(ttsAudio.src); }
@@ -534,12 +615,33 @@ async function ttsPlay() {
   }
 }
 
-function ttsPause()   { if (ttsAudio && !ttsAudio.paused) ttsAudio.pause(); }
-function ttsStop()    { if (ttsAudio) { ttsAudio.pause(); ttsAudio.currentTime = 0; } stopCmdListener(); updateTtsUI('idle'); }
-function ttsRestart() { if (ttsAudio) { ttsAudio.pause(); URL.revokeObjectURL(ttsAudio.src); ttsAudio = null; } stopCmdListener(); ttsPlay(); }
-function ttsReset()   {
+function ttsPause() {
+  if (ttsUsingWebSpeech) { webSpeechPause(); return; }
+  if (ttsAudio && !ttsAudio.paused) ttsAudio.pause();
+}
+
+function ttsStop() {
+  if (ttsUsingWebSpeech) { webSpeechStop(); return; }
+  if (ttsAudio) { ttsAudio.pause(); ttsAudio.currentTime = 0; }
+  stopCmdListener();
+  updateTtsUI('idle');
+}
+
+function ttsRestart() {
+  if (ttsUsingWebSpeech) { webSpeechStop(); webSpeechPlay(ttsText); return; }
   if (ttsAudio) { ttsAudio.pause(); URL.revokeObjectURL(ttsAudio.src); ttsAudio = null; }
-  stopCmdListener(); ttsText = ''; ttsFetching = false; updateTtsUI('hidden');
+  stopCmdListener();
+  ttsPlay();
+}
+
+function ttsReset() {
+  if (ttsUsingWebSpeech) { webSpeechStop(); }
+  if (ttsAudio) { ttsAudio.pause(); URL.revokeObjectURL(ttsAudio.src); ttsAudio = null; }
+  stopCmdListener();
+  ttsText = '';
+  ttsFetching = false;
+  ttsUsingWebSpeech = false;
+  updateTtsUI('hidden');
 }
 
 // ── TTS – UI state machine ────────────────────────────────────────────────────

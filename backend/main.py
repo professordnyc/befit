@@ -16,6 +16,9 @@ Configuration (environment variables / .env):
   ELEVENLABS_API_KEY    – required for TTS; proxied server-side, never sent to browser
   ELEVENLABS_VOICE_ID   – optional, defaults to Rachel (21m00Tcm4TlvDq8ikWAM)
   ALLOWED_ORIGINS       – optional comma-separated CORS origins, defaults to *
+
+Note: When ELEVENLABS_API_KEY is absent the /tts endpoint returns 503, which triggers
+the browser-side WebSpeech API fallback automatically (no server config needed).
 """
 
 from __future__ import annotations
@@ -137,6 +140,7 @@ async def text_to_speech(body: TTSRequest):
     Proxy ElevenLabs TTS. Accepts { text }, returns audio/mpeg.
     The ELEVENLABS_API_KEY is kept server-side and never exposed to the browser.
     Text is capped at 2500 chars (ElevenLabs free-tier per-request limit).
+    Returns 503 when ELEVENLABS_API_KEY is not set so the browser WebSpeech fallback triggers.
     """
     if not ELEVENLABS_API_KEY:
         raise HTTPException(
