@@ -23,3 +23,5 @@ This document describes what Befit does **not** do and important safety constrai
 - Speech recognition may mishear names or quantities; users should verify transcriptions.
 - Visual analysis is based only on visible labels/packaging in the frame.
 - Audio output is for convenience only and does not change the non-medical nature of guidance.
+- Voice commands ("play", "pause", "stop", "restart") control audio playback only; they do not re-run the wellness pipeline or alter the plan.
+- Speech recognition for voice commands may mishear words in noisy environments; use the on-screen player bar buttons as a fallback.

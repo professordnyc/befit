@@ -164,7 +164,6 @@ body {
 .btn-reset-query:hover { background: var(--color-info-bg); }
 .btn-reset-query:active { transform: scale(.97); }
 
-
 /* ── Query textarea ── */
 .query-input {
   width: 100%;
@@ -432,13 +431,8 @@ body {
   background: var(--color-info-bg);
   border-color: var(--color-primary-dk);
 }
-#btn-mic:active:not(:disabled) {
-  transform: scale(.93);
-}
-#btn-mic:disabled {
-  opacity: .4;
-  cursor: not-allowed;
-}
+#btn-mic:active:not(:disabled) { transform: scale(.93); }
+#btn-mic:disabled { opacity: .4; cursor: not-allowed; }
 
 /* Mic active (listening) state */
 #btn-mic.mic-active {
@@ -527,4 +521,61 @@ body {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* ── TTS audio player bar (ElevenLabs) ── */
+.tts-bar {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+  padding: .65rem .85rem;
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-info-bd);
+  border-radius: var(--radius-sm);
+}
+
+.tts-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .4rem .85rem;
+  min-height: 44px;
+  font-size: .88rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--color-primary-dk);
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition), transform var(--transition);
+  white-space: nowrap;
+}
+.tts-btn:hover:not(:disabled) { background: #d9edd9; }
+.tts-btn:active:not(:disabled) { transform: scale(.96); }
+.tts-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.tts-btn--play {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+.tts-btn--play:hover:not(:disabled) { background: var(--color-primary-dk); }
+
+.tts-icon { font-size: 1rem; line-height: 1; }
+
+.tts-status {
+  font-size: .82rem;
+  color: var(--color-muted);
+  font-style: italic;
+  margin-left: auto;
+  min-width: 8rem;
+  text-align: right;
+}
+
+@media (max-width: 420px) {
+  .tts-bar { gap: .4rem; }
+  .tts-label { display: none; }
+  .tts-status { min-width: auto; margin-left: 0; }
 }

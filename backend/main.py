@@ -3,27 +3,32 @@ main.py – Befit FastAPI backend.
 
 Endpoints:
   POST /scan-and-plan  – run the full Befit agent pipeline, return TodayCard JSON
+  POST /tts            – proxy ElevenLabs TTS; accepts { text }, returns audio/mpeg
   GET  /health         – liveness check
   GET  /               – serve frontend index.html
   GET  /style.css      – serve frontend stylesheet
   GET  /app.js         – serve frontend script
 
-Configuration is read from environment variables (or a .env file via python-dotenv):
-  OPENAI_API_KEY   – required (use your OpenRouter key or OpenAI key)
-  OPENAI_BASE_URL  – optional, defaults to https://openrouter.ai/api/v1
-  BEFIT_MODEL      – optional, defaults to anthropic/claude-sonnet-4-6
-  ALLOWED_ORIGINS  – optional comma-separated CORS origins, defaults to *
+Configuration (environment variables / .env):
+  OPENAI_API_KEY        – required (OpenRouter or OpenAI key)
+  OPENAI_BASE_URL       – optional, defaults to https://openrouter.ai/api/v1
+  BEFIT_MODEL           – optional, defaults to anthropic/claude-sonnet-4-6
+  ELEVENLABS_API_KEY    – required for TTS; proxied server-side, never sent to browser
+  ELEVENLABS_VOICE_ID   – optional, defaults to Rachel (21m00Tcm4TlvDq8ikWAM)
+  ALLOWED_ORIGINS       – optional comma-separated CORS origins, defaults to *
 """
 
 from __future__ import annotations
 import logging
 import os
 
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel
 from openai import AsyncOpenAI
 
 from .schemas import TodayCard, ScanAndPlanRequest
@@ -43,13 +48,19 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 load_dotenv()
 
-API_KEY = os.getenv("OPENAI_API_KEY", "")
-BASE_URL = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
-MODEL = os.getenv("BEFIT_MODEL", "anthropic/claude-sonnet-4-6")
+API_KEY      = os.getenv("OPENAI_API_KEY", "")
+BASE_URL     = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+MODEL        = os.getenv("BEFIT_MODEL", "anthropic/claude-sonnet-4-6")
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",")]
+
+ELEVENLABS_API_KEY  = os.getenv("ELEVENLABS_API_KEY", "")
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")  # Rachel
+ELEVENLABS_TTS_URL  = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
 
 if not API_KEY:
     logger.warning("OPENAI_API_KEY is not set — LLM calls will fail at runtime.")
+if not ELEVENLABS_API_KEY:
+    logger.warning("ELEVENLABS_API_KEY is not set — /tts calls will fail at runtime.")
 
 # ---------------------------------------------------------------------------
 # OpenAI-compatible async client
@@ -114,6 +125,58 @@ async def scan_and_plan(body: ScanAndPlanRequest) -> TodayCard:
         raise HTTPException(status_code=500, detail=f"Pipeline error: {exc}") from exc
 
     return card
+
+
+class TTSRequest(BaseModel):
+    text: str
+
+
+@app.post("/tts")
+async def text_to_speech(body: TTSRequest):
+    """
+    Proxy ElevenLabs TTS. Accepts { text }, returns audio/mpeg.
+    The ELEVENLABS_API_KEY is kept server-side and never exposed to the browser.
+    Text is capped at 2500 chars (ElevenLabs free-tier per-request limit).
+    """
+    if not ELEVENLABS_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="ELEVENLABS_API_KEY is not configured on the server.",
+        )
+
+    text = body.text.strip()[:2500]
+    if not text:
+        raise HTTPException(status_code=400, detail="text must not be empty.")
+
+    payload = {
+        "text": text,
+        "model_id": "eleven_turbo_v2",
+        "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
+    }
+    headers = {
+        "xi-api-key": ELEVENLABS_API_KEY,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as http:
+            resp = await http.post(ELEVENLABS_TTS_URL, json=payload, headers=headers)
+        if resp.status_code != 200:
+            logger.error("ElevenLabs TTS error %s: %s", resp.status_code, resp.text[:200])
+            raise HTTPException(
+                status_code=502,
+                detail=f"ElevenLabs error {resp.status_code}",
+            )
+    except httpx.RequestError as exc:
+        logger.exception("ElevenLabs TTS request failed: %s", exc)
+        raise HTTPException(status_code=502, detail="TTS service unreachable.") from exc
+
+    return StreamingResponse(
+        iter([resp.content]),
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 # ---------------------------------------------------------------------------

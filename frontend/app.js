@@ -6,11 +6,23 @@
  *   2. User types (or speaks) a wellness question
  *   3. Submit → POST /scan-and-plan → today_card JSON
  *   4. Render card into DOM
+ *   5. ElevenLabs TTS auto-reads the plan via POST /tts (proxied, key stays server-side)
+ *
+ * TTS voice commands (spoken while audio is playing or paused):
+ *   "play"  | "start"   → play / resume
+ *   "pause"             → pause
+ *   "stop"              → stop and rewind
+ *   "restart"           → re-fetch and play from the beginning
+ *
+ * Voice commands use a dedicated continuous SpeechRecognition session
+ * (cmdRecognition) that runs only while TTS is active. This is separate
+ * from the query mic so commands never appear in the query box, and
+ * continuous=true keeps the session alive across the full audio playback.
  */
 
 'use strict';
 
-// ── DOM refs ────────────────────────────────────────────────────────────────
+// ── DOM refs ─────────────────────────────────────────────────────────────────
 const uploadArea        = document.getElementById('upload-area');
 const fileInput         = document.getElementById('file-input');
 const previewImg        = document.getElementById('preview-img');
@@ -36,22 +48,42 @@ const tcLimitations  = document.getElementById('tc-limitations');
 const tcItemsSection = document.getElementById('tc-items-section');
 const tcFlagsSection = document.getElementById('tc-flags-section');
 
-// ── Voice / STT DOM refs ─────────────────────────────────────────────────────
+// ── STT DOM refs ──────────────────────────────────────────────────────────────
 const btnMic         = document.getElementById('btn-mic');
 const micIcon        = document.getElementById('mic-icon');
 const toggleAlwaysOn = document.getElementById('toggle-always-on');
 const micStatus      = document.getElementById('mic-status');
 const micError       = document.getElementById('mic-error');
 
-// ── State ────────────────────────────────────────────────────────────────────
+// ── TTS DOM refs ──────────────────────────────────────────────────────────────
+const ttsBar        = document.getElementById('tts-bar');
+const btnTtsPlay    = document.getElementById('btn-tts-play');
+const btnTtsPause   = document.getElementById('btn-tts-pause');
+const btnTtsStop    = document.getElementById('btn-tts-stop');
+const btnTtsRestart = document.getElementById('btn-tts-restart');
+const ttsStatus     = document.getElementById('tts-status');
+
+// ── App state ─────────────────────────────────────────────────────────────────
 let imageDataUri = null;
 
-// ── Voice / STT state ────────────────────────────────────────────────────────
-let recognition  = null;   // SpeechRecognition instance
-let isListening  = false;  // is mic currently active?
-let alwaysOn     = false;  // always-on mode
+// ── Query STT state ───────────────────────────────────────────────────────────
+let recognition = null;   // SpeechRecognition for query input
+let isListening = false;
+let alwaysOn    = false;
 
-// ── Image selection ──────────────────────────────────────────────────────────
+// ── TTS command listener state ────────────────────────────────────────────────
+// A dedicated continuous SpeechRecognition session active only while TTS plays.
+// Runs independently from the query mic: commands never appear in the query box.
+let cmdRecognition = null;
+let cmdListening   = false;
+
+// ── TTS playback state ────────────────────────────────────────────────────────
+/** @type {HTMLAudioElement|null} */
+let ttsAudio    = null;
+let ttsText     = '';
+let ttsFetching = false;
+
+// ── Image selection ───────────────────────────────────────────────────────────
 uploadArea.addEventListener('click', () => fileInput.click());
 uploadArea.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
@@ -71,7 +103,7 @@ fileInput.addEventListener('change', () => {
   reader.readAsDataURL(file);
 });
 
-// ── Drag-and-drop ────────────────────────────────────────────────────────────
+// ── Drag-and-drop ─────────────────────────────────────────────────────────────
 uploadArea.addEventListener('dragover', (e) => {
   e.preventDefault();
   uploadArea.style.borderColor = 'var(--color-primary)';
@@ -84,7 +116,6 @@ uploadArea.addEventListener('drop', (e) => {
   uploadArea.style.borderColor = '';
   const file = e.dataTransfer.files[0];
   if (file && file.type.startsWith('image/')) {
-    // Assign to input and trigger change handler
     const dt = new DataTransfer();
     dt.items.add(file);
     fileInput.files = dt.files;
@@ -92,7 +123,7 @@ uploadArea.addEventListener('drop', (e) => {
   }
 });
 
-// ── Enable submit only when both image and query are present ─────────────────
+// ── Submit guard ──────────────────────────────────────────────────────────────
 userQuery.addEventListener('input', updateSubmitState);
 
 function updateSubmitState() {
@@ -109,13 +140,12 @@ async function runPipeline() {
   setLoading(true);
   hideError();
   todayCardEl.style.display = 'none';
-
-  const userContext = buildContext();
+  ttsReset();
 
   const body = {
     image_url:    imageDataUri,
     user_query:   userQuery.value.trim(),
-    user_context: userContext,
+    user_context: buildContext(),
   };
 
   try {
@@ -127,14 +157,17 @@ async function runPipeline() {
 
     if (!res.ok) {
       let detail = '';
-      try { detail = (await res.json()).detail; } catch { detail = await res.text(); }
-      throw new Error(`Server error ${res.status}: ${detail}`);
+      try { detail = (await res.json()).detail; } catch (_) { detail = await res.text(); }
+      throw new Error('Server error ' + res.status + ': ' + detail);
     }
 
     const card = await res.json();
     renderCard(card);
     todayCardEl.style.display = 'flex';
     todayCardEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    ttsText = buildTtsScript(card);
+    ttsPlay();
   } catch (err) {
     showError(err.message || 'Something went wrong. Please try again.');
   } finally {
@@ -149,32 +182,26 @@ function buildContext() {
   const constraints = rawConst
     ? rawConst.split(',').map(s => s.trim()).filter(Boolean)
     : [];
-
   if (!goal && !person && !constraints.length) return null;
   return Object.assign(
     {},
-    goal        ? { goal }        : {},
-    person      ? { person }      : {},
+    goal               ? { goal }        : {},
+    person             ? { person }      : {},
     constraints.length ? { constraints } : {},
   );
 }
 
 // ── Render TodayCard ──────────────────────────────────────────────────────────
 function renderCard(card) {
-  // Goal summary
   tcGoal.textContent = card.goal_summary || '';
 
-  // Detected items
   tcItems.innerHTML = '';
   if (card.items_detected && card.items_detected.length) {
     tcItemsSection.style.display = '';
     card.items_detected.forEach(item => {
       const li = document.createElement('li');
-      li.innerHTML =
-        esc(item.name) +
-        (item.category
-          ? `<span class="chip-category">${esc(item.category)}</span>`
-          : '');
+      li.innerHTML = esc(item.name) +
+        (item.category ? '<span class="chip-category">' + esc(item.category) + '</span>' : '');
       if (item.notes) li.title = item.notes;
       tcItems.appendChild(li);
     });
@@ -182,17 +209,15 @@ function renderCard(card) {
     tcItemsSection.style.display = 'none';
   }
 
-  // Risk flags – always show warnings/cautions; show info only when few flags
   tcFlags.innerHTML = '';
   const flags = card.risk_flags || [];
   const showInfo = flags.length <= 3;
   const visibleFlags = flags.filter(f => f.level !== 'info' || showInfo);
-
   if (visibleFlags.length) {
     tcFlagsSection.style.display = '';
     visibleFlags.forEach(flag => {
       const li = document.createElement('li');
-      li.className = `flag-item flag-${esc(flag.level)}`;
+      li.className = 'flag-item flag-' + esc(flag.level);
       li.textContent = flag.message;
       tcFlags.appendChild(li);
     });
@@ -200,28 +225,24 @@ function renderCard(card) {
     tcFlagsSection.style.display = 'none';
   }
 
-  // Actions
   tcActions.innerHTML = '';
   (card.actions || []).forEach((action, i) => {
     const li = document.createElement('li');
     li.className = 'action-item';
-    li.innerHTML = `
-      <div class="action-number" aria-hidden="true">${i + 1}</div>
-      <div class="action-body">
-        <div class="action-title">${esc(action.title)}</div>
-        <div class="action-desc">${esc(action.description)}</div>
-      </div>`;
+    li.innerHTML =
+      '<div class="action-number" aria-hidden="true">' + (i + 1) + '</div>' +
+      '<div class="action-body">' +
+        '<div class="action-title">' + esc(action.title) + '</div>' +
+        '<div class="action-desc">'  + esc(action.description) + '</div>' +
+      '</div>';
     tcActions.appendChild(li);
   });
 
-  // Why
-  tcWhy.textContent = card.why || '';
-
-  // Limitations
+  tcWhy.textContent         = card.why         || '';
   tcLimitations.textContent = card.limitations || '';
 }
 
-// ── Reset query & context fields only ───────────────────────────────────────
+// ── Reset query only ──────────────────────────────────────────────────────────
 btnResetQuery.addEventListener('click', () => {
   userQuery.value = '';
   ctxGoal.value = '';
@@ -229,7 +250,6 @@ btnResetQuery.addEventListener('click', () => {
   ctxConstraints.value = '';
   hideError();
   updateSubmitState();
-  // Reset mic state
   alwaysOn = false;
   toggleAlwaysOn.checked = false;
   stopListening();
@@ -238,7 +258,7 @@ btnResetQuery.addEventListener('click', () => {
   userQuery.focus();
 });
 
-// ── Reset ─────────────────────────────────────────────────────────────────────
+// ── Full reset ────────────────────────────────────────────────────────────────
 btnReset.addEventListener('click', () => {
   imageDataUri = null;
   fileInput.value = '';
@@ -252,13 +272,13 @@ btnReset.addEventListener('click', () => {
   todayCardEl.style.display = 'none';
   hideError();
   updateSubmitState();
-  // Reset mic state
   alwaysOn = false;
   toggleAlwaysOn.checked = false;
   stopListening();
   hideMicError();
   micStatus.textContent = '';
   updateMicUI();
+  ttsReset();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
@@ -287,17 +307,10 @@ function esc(str) {
     .replace(/'/g, '&#39;');
 }
 
-// ── Voice / STT helpers ───────────────────────────────────────────────────────
-function showMicError(msg) {
-  micError.textContent = '🎤 ' + msg;
-  micError.style.display = '';
-}
-function hideMicError() {
-  micError.textContent = '';
-  micError.style.display = 'none';
-}
+// ── Query STT helpers ─────────────────────────────────────────────────────────
+function showMicError(msg) { micError.textContent = '🎙️ ' + msg; micError.style.display = ''; }
+function hideMicError()    { micError.textContent = '';                            micError.style.display = 'none'; }
 
-// ── updateMicUI ───────────────────────────────────────────────────────────────
 function updateMicUI() {
   if (isListening) {
     btnMic.setAttribute('aria-pressed', 'true');
@@ -308,16 +321,14 @@ function updateMicUI() {
   } else {
     btnMic.setAttribute('aria-pressed', 'false');
     btnMic.classList.remove('mic-active');
-    micIcon.textContent = '🎤';
+    micIcon.textContent = '🎙️';
     btnMic.setAttribute('aria-label', 'Start voice input');
     micStatus.textContent = '';
   }
 }
 
-// ── startListening / stopListening ────────────────────────────────────────────
 function startListening() {
   if (!recognition) return;
-  // Stop any existing session before starting a fresh one
   try { recognition.stop(); } catch (_) { /* ignore */ }
   recognition.start();
 }
@@ -327,15 +338,12 @@ function stopListening() {
   try { recognition.stop(); } catch (_) { /* ignore */ }
 }
 
-// ── initSpeech ────────────────────────────────────────────────────────────────
+// ── initSpeech – query mic ────────────────────────────────────────────────────
 function initSpeech() {
-  const SpeechRecognition =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
-
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
     btnMic.disabled = true;
     btnMic.title = 'Speech recognition not supported in this browser';
-    // Hide the always-on toggle row
     if (toggleAlwaysOn && toggleAlwaysOn.parentElement) {
       toggleAlwaysOn.parentElement.style.display = 'none';
     }
@@ -347,54 +355,37 @@ function initSpeech() {
   recognition.interimResults = true;
   recognition.lang           = 'en-US';
 
-  // Track interim vs. final transcripts within a session
-  let finalTranscript   = '';
-  let interimTranscript = '';
+  let finalTranscript = '', interimTranscript = '';
 
   recognition.onstart = () => {
-    isListening       = true;
-    finalTranscript   = '';
-    interimTranscript = '';
+    isListening = true;
+    finalTranscript = interimTranscript = '';
     updateMicUI();
   };
 
   recognition.onend = () => {
     isListening = false;
     updateMicUI();
-    // If always-on is still active, restart after a short delay
-    if (alwaysOn) {
-      setTimeout(() => {
-        if (alwaysOn) startListening();
-      }, 300);
-    }
+    if (alwaysOn) setTimeout(() => { if (alwaysOn) startListening(); }, 300);
   };
 
   recognition.onerror = (event) => {
     isListening = false;
     updateMicUI();
-    // 'no-speech' is expected in always-on mode; fail silently
     if (event.error !== 'no-speech') {
       showMicError(event.error || 'Microphone error. Please try again.');
     }
   };
 
   recognition.onresult = (event) => {
-    finalTranscript   = '';
-    interimTranscript = '';
-
+    finalTranscript = interimTranscript = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
-      const result = event.results[i];
-      if (result.isFinal) {
-        finalTranscript += result[0].transcript;
-      } else {
-        interimTranscript += result[0].transcript;
-      }
+      const r = event.results[i];
+      if (r.isFinal) finalTranscript  += r[0].transcript;
+      else           interimTranscript += r[0].transcript;
     }
-
-    // Show combined text live in the textarea
     userQuery.value = finalTranscript + interimTranscript;
 
-    // On a truly final result (last result is final), settle the value
     if (event.results[event.results.length - 1].isFinal) {
       interimTranscript = '';
       userQuery.value   = finalTranscript.trim();
@@ -402,13 +393,63 @@ function initSpeech() {
       hideMicError();
     }
   };
+
+  // ── initCmdListener – TTS voice command mic ─────────────────────────────────
+  // Uses a second, independent SpeechRecognition instance with continuous=true
+  // so it stays open through the full audio playback without polling gaps.
+  cmdRecognition = new SpeechRecognition();
+  cmdRecognition.continuous     = true;   // stay open; don't stop between phrases
+  cmdRecognition.interimResults = false;  // only act on settled results
+  cmdRecognition.lang           = 'en-US';
+
+  cmdRecognition.onstart = () => { cmdListening = true; };
+  cmdRecognition.onend   = () => {
+    cmdListening = false;
+    // If TTS is still active, restart the command listener automatically
+    if (ttsAudio && !ttsAudio.ended) {
+      setTimeout(() => {
+        if (ttsAudio && !ttsAudio.ended) startCmdListener();
+      }, 150);
+    }
+  };
+  cmdRecognition.onerror = (event) => {
+    cmdListening = false;
+    // 'no-speech' and 'aborted' are expected; restart silently if TTS still running
+    if (ttsAudio && !ttsAudio.ended && event.error !== 'aborted') {
+      setTimeout(() => startCmdListener(), 300);
+    }
+  };
+  cmdRecognition.onresult = (event) => {
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      if (!event.results[i].isFinal) continue;
+      const cmd = event.results[i][0].transcript
+        .toLowerCase()
+        .replace(/[^a-z ]/g, '')
+        .trim();
+      if (cmd === 'play' || cmd === 'start') { ttsPlay();    break; }
+      if (cmd === 'pause')                   { ttsPause();   break; }
+      if (cmd === 'stop')                    { ttsStop();    break; }
+      if (cmd === 'restart')                 { ttsRestart(); break; }
+    }
+  };
 }
 
-// ── Mic button click handler ──────────────────────────────────────────────────
+function startCmdListener() {
+  if (!cmdRecognition || cmdListening) return;
+  try { cmdRecognition.start(); } catch (_) { /* already running */ }
+}
+
+function stopCmdListener() {
+  if (!cmdRecognition) return;
+  try { cmdRecognition.stop(); } catch (_) { /* ignore */ }
+  cmdListening = false;
+}
+
+// ── Mic button / always-on toggle ─────────────────────────────────────────────
 btnMic.addEventListener('click', () => {
   hideMicError();
   if (isListening) {
-    alwaysOn = false;          // clicking stop always disables always-on too
+    alwaysOn = false;
     toggleAlwaysOn.checked = false;
     stopListening();
   } else {
@@ -416,15 +457,146 @@ btnMic.addEventListener('click', () => {
   }
 });
 
-// ── Always-on toggle handler ──────────────────────────────────────────────────
 toggleAlwaysOn.addEventListener('change', () => {
   alwaysOn = toggleAlwaysOn.checked;
-  if (alwaysOn && !isListening) {
-    startListening();
-  } else if (!alwaysOn && isListening) {
-    stopListening();
-  }
+  if (alwaysOn && !isListening) startListening();
+  else if (!alwaysOn && isListening) stopListening();
 });
 
-// ── Initialise speech on load ─────────────────────────────────────────────────
+// ── TTS – build plain-text script from card ───────────────────────────────────
+function buildTtsScript(card) {
+  const parts = [];
+  if (card.goal_summary) parts.push(card.goal_summary + '.');
+  (card.actions || []).forEach((a, i) => {
+    parts.push('Action ' + (i + 1) + ': ' + a.title + '. ' + a.description);
+  });
+  if (card.why) parts.push('Why this matters: ' + card.why);
+  // Limitations are visual-only per LIMITATIONS.md – not read aloud
+  return parts.join(' ');
+}
+
+// ── TTS – core ────────────────────────────────────────────────────────────────
+
+async function ttsPlay() {
+  if (ttsFetching) return;
+
+  // Resume paused audio without a new network request
+  if (ttsAudio && ttsAudio.paused && ttsAudio.currentSrc) {
+    ttsAudio.play();
+    updateTtsUI('playing');
+    startCmdListener();
+    return;
+  }
+
+  // Already playing
+  if (ttsAudio && !ttsAudio.paused) return;
+
+  if (!ttsText) return;
+  ttsFetching = true;
+  updateTtsUI('loading');
+
+  try {
+    const res = await fetch('/tts', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ text: ttsText }),
+    });
+
+    if (!res.ok) {
+      let detail = '';
+      try { detail = (await res.json()).detail; } catch (_) { detail = await res.text(); }
+      throw new Error('TTS error ' + res.status + ': ' + detail);
+    }
+
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+
+    if (ttsAudio) { ttsAudio.pause(); URL.revokeObjectURL(ttsAudio.src); }
+
+    ttsAudio = new Audio(url);
+    ttsAudio.onplay  = () => { updateTtsUI('playing'); startCmdListener(); };
+    ttsAudio.onpause = () => { updateTtsUI('paused');  /* keep cmd listener alive while paused */ };
+    ttsAudio.onended = () => { updateTtsUI('idle');    stopCmdListener(); };
+    ttsAudio.onerror = () => { updateTtsUI('idle');    stopCmdListener(); };
+    ttsAudio.play();
+  } catch (err) {
+    updateTtsUI('idle');
+    stopCmdListener();
+    ttsStatus.textContent = '⚠️ Audio unavailable';
+    console.warn('TTS play error:', err.message);
+  } finally {
+    ttsFetching = false;
+  }
+}
+
+function ttsPause() {
+  if (ttsAudio && !ttsAudio.paused) ttsAudio.pause();
+  // cmd listener stays alive so user can say "play" to resume
+}
+
+function ttsStop() {
+  if (ttsAudio) {
+    ttsAudio.pause();
+    ttsAudio.currentTime = 0;
+  }
+  stopCmdListener();
+  updateTtsUI('idle');
+}
+
+function ttsRestart() {
+  if (ttsAudio) {
+    ttsAudio.pause();
+    URL.revokeObjectURL(ttsAudio.src);
+    ttsAudio = null;
+  }
+  stopCmdListener();
+  ttsPlay();
+}
+
+/** Full teardown – called on reset. */
+function ttsReset() {
+  if (ttsAudio) {
+    ttsAudio.pause();
+    URL.revokeObjectURL(ttsAudio.src);
+    ttsAudio = null;
+  }
+  stopCmdListener();
+  ttsText     = '';
+  ttsFetching = false;
+  updateTtsUI('hidden');
+}
+
+// ── TTS – UI state machine ────────────────────────────────────────────────────
+/**
+ * @param {'hidden'|'loading'|'playing'|'paused'|'idle'} state
+ */
+function updateTtsUI(state) {
+  const show = (el, yes) => { el.style.display = yes ? '' : 'none'; };
+
+  if (state === 'hidden') {
+    ttsBar.style.display  = 'none';
+    ttsStatus.textContent = '';
+    return;
+  }
+
+  ttsBar.style.display = '';
+
+  show(btnTtsPlay,    state === 'idle'  || state === 'paused' || state === 'loading');
+  show(btnTtsPause,   state === 'playing');
+  show(btnTtsStop,    state === 'playing' || state === 'paused');
+  show(btnTtsRestart, state === 'playing' || state === 'paused' || state === 'idle');
+
+  btnTtsPlay.disabled = state === 'loading';
+
+  const labels = { loading: '⏳ Loading audio…', playing: '🔊 Playing…', paused: '⏸ Paused', idle: '' };
+  ttsStatus.textContent = labels[state] ?? '';
+}
+
+// ── TTS – button handlers ─────────────────────────────────────────────────────
+btnTtsPlay.addEventListener('click',    () => ttsPlay());
+btnTtsPause.addEventListener('click',   () => ttsPause());
+btnTtsStop.addEventListener('click',    () => ttsStop());
+btnTtsRestart.addEventListener('click', () => ttsRestart());
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
 initSpeech();
