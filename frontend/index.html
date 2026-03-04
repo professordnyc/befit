@@ -18,21 +18,46 @@
 
   <main class="app-main">
 
-    <!-- ── Step 1 – Upload / Capture ── -->
+    <!-- ── Step 1 – Live Camera / Upload ── -->
     <section class="card" id="section-upload">
       <h2 class="card-title">1. Show us your pantry, fridge, or medicine cabinet</h2>
 
-      <div class="upload-area" id="upload-area" role="button" tabindex="0"
-           aria-label="Click or tap to choose an image">
-        <img id="preview-img" class="preview-img" style="display:none" alt="Preview of your uploaded image" />
-        <div id="upload-placeholder" class="upload-placeholder">
-          <span class="upload-icon">📷</span>
-          <p>Tap to take a photo or upload an image</p>
+      <!-- Live camera view (default) -->
+      <div class="camera-container" id="camera-container">
+        <video id="camera-feed" class="camera-feed" autoplay playsinline muted
+               aria-label="Live camera feed – point at your pantry, fridge, or cabinet"></video>
+        <div class="camera-overlay">
+          <span class="camera-hint">Point at your pantry, fridge, or cabinet</span>
+        </div>
+        <div class="camera-controls">
+          <button id="btn-capture" class="btn-capture" type="button" aria-label="Capture frame">
+            <span class="capture-icon">📸</span>
+            <span>Capture</span>
+          </button>
+          <button id="btn-switch-cam" class="btn-icon-sm" type="button"
+                  aria-label="Switch camera" title="Switch camera" style="display:none">🔄</button>
         </div>
       </div>
 
-      <input type="file" id="file-input" accept="image/*" capture="environment"
-             style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden" />
+      <!-- Captured / uploaded preview -->
+      <div class="preview-container" id="preview-container" style="display:none">
+        <img id="preview-img" class="preview-img" alt="Captured or uploaded image preview" />
+        <button id="btn-retake" class="btn-retake" type="button" aria-label="Retake or change image">
+          ↩ Retake
+        </button>
+      </div>
+
+      <!-- Camera error -->
+      <div id="camera-error" class="camera-error" role="alert" style="display:none"></div>
+
+      <!-- Upload fallback -->
+      <div class="upload-toolbar">
+        <label class="btn-upload-label" aria-label="Upload an image instead">
+          <span>⬆ Upload image</span>
+          <input type="file" id="file-input" accept="image/*"
+                 style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden" />
+        </label>
+      </div>
     </section>
 
     <!-- ── Step 2 – Question ── -->
@@ -121,7 +146,7 @@
         <p id="tc-goal" class="tc-goal"></p>
       </header>
 
-      <!-- ── TTS player bar (ElevenLabs audio output) ── -->
+      <!-- ── TTS player bar ── -->
       <div class="tts-bar" id="tts-bar" style="display:none"
            role="group" aria-label="Listen to your plan">
         <button id="btn-tts-play" class="tts-btn tts-btn--play" type="button"

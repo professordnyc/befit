@@ -25,3 +25,8 @@ This document describes what Befit does **not** do and important safety constrai
 - Audio output is for convenience only and does not change the non-medical nature of guidance.
 - Voice commands ("play", "pause", "stop", "restart") control audio playback only; they do not re-run the wellness pipeline or alter the plan.
 - Speech recognition for voice commands may mishear words in noisy environments; use the on-screen player bar buttons as a fallback.
+
+## Camera limitations
+- Live camera feed requires browser permission; if denied, users must upload an image instead.
+- Frame capture quality depends on device camera and ambient lighting; poor lighting may reduce item detection accuracy.
+- Camera stream is stopped immediately after frame capture to conserve device resources.

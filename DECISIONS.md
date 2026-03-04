@@ -112,3 +112,26 @@ LIMITATIONS.md documents "Audio output is for convenience only."
 
 **New env vars:** `ELEVENLABS_API_KEY` (required, server-side only), `ELEVENLABS_VOICE_ID` (optional, defaults to Rachel `21m00Tcm4TlvDq8ikWAM`).
 **No new packages.** `httpx` 0.28.1 already present as a transitive dependency.
+
+## 2026-03-04
+
+### Feature: Live camera frame capture
+
+**Rationale:** AGENTS.md Vision Interpreter spec states it must "take in uploaded or live video frame and mobile camera input." README.md lists live-frame handling as a key feature. This replaces the tap-to-upload area with an active camera feed that starts on page load.
+
+**Files changed (3, frontend only — backend unchanged):**
+
+- `frontend/index.html` – Replaced static upload area with a `<video>` live camera feed (`#camera-container`) plus a "Capture" button, a "Switch camera" button (shown only when multiple cameras are detected), a captured/uploaded preview block (`#preview-container`) with a "Retake" overlay button, a camera error banner, and an "Upload image" fallback label that is always visible.
+
+- `frontend/app.js` – Added camera module:
+  - `initCamera()` – enumerates videoinput devices, shows "Switch camera" if > 1, calls `startCamera()`.
+  - `startCamera(deviceId)` – requests `facingMode: environment` (rear) by default; falls back to any camera if no deviceId given; sets `<video>.srcObject`.
+  - `captureFrame()` – draws `<video>` frame onto an off-screen `<canvas>`, encodes as JPEG base-64 (quality 0.85), stops the stream, shows preview. Same `imageDataUri` path used by existing upload flow.
+  - `retake()` – clears captured image and restarts camera.
+  - File upload listener updated to stop stream before showing preview.
+  - Full reset (`btn-reset`) now calls `initCamera()` to restart the feed.
+  - No backend changes required; `/scan-and-plan` already accepts base-64 `image_url`.
+
+- `frontend/style.css` – Appended camera-specific rules using existing design tokens: `.camera-container`, `.camera-feed`, `.camera-overlay`, `.camera-hint`, `.camera-controls`, `.btn-capture` (≥ 48 px tap target), `.btn-icon-sm` (switch camera, ≥ 44 px), `.preview-container`, `.btn-retake`, `.camera-error`, `.upload-toolbar`, `.btn-upload-label`.
+
+**No new packages, no backend changes, no API key changes.**

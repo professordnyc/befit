@@ -161,3 +161,11 @@ while keeping the system debuggable and safe for a wellness-oriented, non-diagno
   mic so commands never appear in the query textarea.
 - The `ELEVENLABS_API_KEY` is server-side only and never exposed to the browser.
 - Auto-plays when the plan card renders; tears down cleanly on both reset buttons.
+
+
+## Camera / Live Frame Capture
+- The Vision Interpreter accepts both file-uploaded images and frames captured from the live camera feed.
+- `initCamera()` starts automatically on page load, requesting the rear-facing camera (`facingMode: environment`).
+- The "Capture" button snapshots the live frame; the resulting base-64 JPEG is sent to `/scan-and-plan` identically to an uploaded file.
+- "Retake" restarts the camera stream so the user can reframe before capturing again.
+- If camera access is denied or unavailable, a descriptive error is shown and the "Upload image" fallback remains accessible.

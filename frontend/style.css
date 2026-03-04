@@ -579,3 +579,141 @@ body {
   .tts-label { display: none; }
   .tts-status { min-width: auto; margin-left: 0; }
 }
+
+/* ── Live Camera ─────────────────────────────────────────────────────────── */
+.camera-container {
+  position: relative;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #111;
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-feed {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  display: block;
+}
+
+.camera-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: .5rem .75rem;
+  background: linear-gradient(transparent, rgba(0,0,0,.5));
+  pointer-events: none;
+}
+.camera-hint {
+  color: rgba(255,255,255,.85);
+  font-size: .8rem;
+}
+
+.camera-controls {
+  position: absolute;
+  bottom: .75rem;
+  right: .75rem;
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+}
+
+.btn-capture {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .5rem 1.1rem;
+  min-height: 48px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: .9rem;
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+  transition: background var(--transition), transform var(--transition);
+}
+.btn-capture:hover  { background: var(--color-primary-dk); }
+.btn-capture:active { transform: scale(.95); }
+.capture-icon { font-size: 1.2rem; line-height: 1; }
+
+.btn-icon-sm {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,.2);
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+  transition: background var(--transition);
+}
+.btn-icon-sm:hover { background: rgba(255,255,255,.35); }
+
+/* Preview after capture / upload */
+.preview-container {
+  position: relative;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.preview-img {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  display: block;
+}
+.btn-retake {
+  position: absolute;
+  top: .6rem; right: .6rem;
+  padding: .35rem .85rem;
+  min-height: 40px;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  font-size: .85rem;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: background var(--transition);
+}
+.btn-retake:hover { background: rgba(0,0,0,.75); }
+
+/* Camera error */
+.camera-error {
+  background: var(--color-warn-bg);
+  border: 1px solid var(--color-warn-bd);
+  border-radius: var(--radius-sm);
+  padding: .6rem .85rem;
+  font-size: .875rem;
+  color: #7a5a1a;
+  margin-top: .5rem;
+}
+
+/* Upload toolbar (always-available fallback) */
+.upload-toolbar {
+  margin-top: .75rem;
+  display: flex;
+  justify-content: flex-end;
+}
+.btn-upload-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .4rem .9rem;
+  min-height: 44px;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: transparent;
+  border: 1.5px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.btn-upload-label:hover { background: var(--color-info-bg); }

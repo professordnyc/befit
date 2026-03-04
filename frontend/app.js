@@ -2,31 +2,37 @@
  * app.js – Befit frontend controller
  *
  * Flow:
- *   1. User picks / drags an image  → stored as base-64 data URI
- *   2. User types (or speaks) a wellness question
- *   3. Submit → POST /scan-and-plan → today_card JSON
- *   4. Render card into DOM
- *   5. ElevenLabs TTS auto-reads the plan via POST /tts (proxied, key stays server-side)
+ *   1. Camera feed starts on load; user points device at pantry/fridge/cabinet.
+ *   2. "Capture" snaps a frame → base-64 data URI (same path as file upload).
+ *      File upload ("Upload image") is always available as fallback.
+ *   3. User types or speaks a wellness question.
+ *   4. Submit → POST /scan-and-plan → today_card JSON.
+ *   5. Render card; ElevenLabs TTS auto-reads the plan via POST /tts.
  *
- * TTS voice commands (spoken while audio is playing or paused):
- *   "play"  | "start"   → play / resume
- *   "pause"             → pause
- *   "stop"              → stop and rewind
- *   "restart"           → re-fetch and play from the beginning
+ * TTS voice commands (spoken while audio plays/paused):
+ *   "play"|"start" → play/resume  "pause" → pause
+ *   "stop"         → stop/rewind  "restart" → re-fetch and play
  *
- * Voice commands use a dedicated continuous SpeechRecognition session
- * (cmdRecognition) that runs only while TTS is active. This is separate
- * from the query mic so commands never appear in the query box, and
- * continuous=true keeps the session alive across the full audio playback.
+ * Camera notes:
+ *   - Requests rear-facing camera (facingMode: environment) on load.
+ *   - Falls back gracefully if permission denied or no camera found.
+ *   - "Switch camera" button shown only when multiple cameras are detected.
+ *   - Stream is stopped after capture or full page reset.
  */
 
 'use strict';
 
-// ── DOM refs ─────────────────────────────────────────────────────────────────
-const uploadArea        = document.getElementById('upload-area');
-const fileInput         = document.getElementById('file-input');
-const previewImg        = document.getElementById('preview-img');
-const uploadPlaceholder = document.getElementById('upload-placeholder');
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const cameraContainer  = document.getElementById('camera-container');
+const cameraFeed       = document.getElementById('camera-feed');
+const cameraError      = document.getElementById('camera-error');
+const btnCapture       = document.getElementById('btn-capture');
+const btnSwitchCam     = document.getElementById('btn-switch-cam');
+const previewContainer = document.getElementById('preview-container');
+const previewImg       = document.getElementById('preview-img');
+const btnRetake        = document.getElementById('btn-retake');
+const fileInput        = document.getElementById('file-input');
+
 const userQuery         = document.getElementById('user-query');
 const ctxGoal           = document.getElementById('ctx-goal');
 const ctxPerson         = document.getElementById('ctx-person');
@@ -66,14 +72,17 @@ const ttsStatus     = document.getElementById('tts-status');
 // ── App state ─────────────────────────────────────────────────────────────────
 let imageDataUri = null;
 
+// ── Camera state ──────────────────────────────────────────────────────────────
+let cameraStream    = null;  // active MediaStream
+let cameraDevices   = [];    // all videoinput devices
+let cameraDeviceIdx = 0;     // index into cameraDevices
+
 // ── Query STT state ───────────────────────────────────────────────────────────
-let recognition = null;   // SpeechRecognition for query input
+let recognition = null;
 let isListening = false;
 let alwaysOn    = false;
 
 // ── TTS command listener state ────────────────────────────────────────────────
-// A dedicated continuous SpeechRecognition session active only while TTS plays.
-// Runs independently from the query mic: commands never appear in the query box.
 let cmdRecognition = null;
 let cmdListening   = false;
 
@@ -83,44 +92,104 @@ let ttsAudio    = null;
 let ttsText     = '';
 let ttsFetching = false;
 
-// ── Image selection ───────────────────────────────────────────────────────────
-uploadArea.addEventListener('click', () => fileInput.click());
-uploadArea.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+// ── Camera ────────────────────────────────────────────────────────────────────
+function stopStream() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+}
+
+async function startCamera(deviceId) {
+  stopStream();
+  const constraints = {
+    video: deviceId
+      ? { deviceId: { exact: deviceId } }
+      : { facingMode: { ideal: 'environment' } },
+    audio: false,
+  };
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+    cameraFeed.srcObject = cameraStream;
+    cameraContainer.style.display = '';
+    cameraError.style.display = 'none';
+  } catch (err) {
+    showCameraError(err);
+  }
+}
+
+function showCameraError(err) {
+  const msgs = {
+    NotAllowedError:  'Camera permission denied. Please allow camera access and reload.',
+    NotFoundError:    'No camera found on this device. Use "Upload image" below.',
+    NotReadableError: 'Camera is in use by another app. Close it and try again.',
+  };
+  cameraError.textContent = '📷 ' + (msgs[err.name] || 'Camera unavailable: ' + err.message);
+  cameraError.style.display = '';
+  cameraContainer.style.display = 'none';
+}
+
+async function initCamera() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    showCameraError({ name: 'NotFoundError', message: '' });
+    return;
+  }
+  try {
+    const all = await navigator.mediaDevices.enumerateDevices();
+    cameraDevices = all.filter(d => d.kind === 'videoinput');
+    if (cameraDevices.length > 1) btnSwitchCam.style.display = '';
+  } catch (_) { /* non-critical */ }
+
+  await startCamera(cameraDevices[cameraDeviceIdx]?.deviceId);
+}
+
+function captureFrame() {
+  if (!cameraStream) return;
+  const canvas = document.createElement('canvas');
+  canvas.width  = cameraFeed.videoWidth  || 640;
+  canvas.height = cameraFeed.videoHeight || 480;
+  canvas.getContext('2d').drawImage(cameraFeed, 0, 0);
+  imageDataUri = canvas.toDataURL('image/jpeg', 0.85);
+  stopStream();
+
+  previewImg.src = imageDataUri;
+  cameraContainer.style.display = 'none';
+  previewContainer.style.display = '';
+  updateSubmitState();
+}
+
+function retake() {
+  imageDataUri = null;
+  previewImg.src = '';
+  previewContainer.style.display = 'none';
+  cameraError.style.display = 'none';
+  initCamera();
+  updateSubmitState();
+}
+
+btnCapture.addEventListener('click', captureFrame);
+btnRetake.addEventListener('click', retake);
+
+btnSwitchCam.addEventListener('click', async () => {
+  if (!cameraDevices.length) return;
+  cameraDeviceIdx = (cameraDeviceIdx + 1) % cameraDevices.length;
+  await startCamera(cameraDevices[cameraDeviceIdx].deviceId);
 });
 
+// ── File upload (fallback) ────────────────────────────────────────────────────
 fileInput.addEventListener('change', () => {
   const file = fileInput.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = (e) => {
     imageDataUri = e.target.result;
+    stopStream();
     previewImg.src = imageDataUri;
-    previewImg.style.display = 'block';
-    uploadPlaceholder.style.display = 'none';
+    cameraContainer.style.display = 'none';
+    previewContainer.style.display = '';
     updateSubmitState();
   };
   reader.readAsDataURL(file);
-});
-
-// ── Drag-and-drop ─────────────────────────────────────────────────────────────
-uploadArea.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  uploadArea.style.borderColor = 'var(--color-primary)';
-});
-uploadArea.addEventListener('dragleave', () => {
-  uploadArea.style.borderColor = '';
-});
-uploadArea.addEventListener('drop', (e) => {
-  e.preventDefault();
-  uploadArea.style.borderColor = '';
-  const file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) {
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    fileInput.files = dt.files;
-    fileInput.dispatchEvent(new Event('change'));
-  }
 });
 
 // ── Submit guard ──────────────────────────────────────────────────────────────
@@ -196,7 +265,7 @@ function renderCard(card) {
   tcGoal.textContent = card.goal_summary || '';
 
   tcItems.innerHTML = '';
-  if (card.items_detected && card.items_detected.length) {
+  if (card.items_detected?.length) {
     tcItemsSection.style.display = '';
     card.items_detected.forEach(item => {
       const li = document.createElement('li');
@@ -263,8 +332,7 @@ btnReset.addEventListener('click', () => {
   imageDataUri = null;
   fileInput.value = '';
   previewImg.src = '';
-  previewImg.style.display = 'none';
-  uploadPlaceholder.style.display = '';
+  previewContainer.style.display = 'none';
   userQuery.value = '';
   ctxGoal.value = '';
   ctxPerson.value = '';
@@ -279,6 +347,7 @@ btnReset.addEventListener('click', () => {
   micStatus.textContent = '';
   updateMicUI();
   ttsReset();
+  initCamera();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
@@ -289,27 +358,18 @@ function setLoading(on) {
   btnSpinner.style.display = on ? 'inline-block' : 'none';
 }
 
-function showError(msg) {
-  errorBanner.textContent = '⚠️  ' + msg;
-  errorBanner.style.display = '';
-}
-function hideError() {
-  errorBanner.textContent = '';
-  errorBanner.style.display = 'none';
-}
+function showError(msg) { errorBanner.textContent = '⚠️  ' + msg; errorBanner.style.display = ''; }
+function hideError()    { errorBanner.textContent = '';            errorBanner.style.display = 'none'; }
 
 function esc(str) {
   return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // ── Query STT helpers ─────────────────────────────────────────────────────────
 function showMicError(msg) { micError.textContent = '🎙️ ' + msg; micError.style.display = ''; }
-function hideMicError()    { micError.textContent = '';                            micError.style.display = 'none'; }
+function hideMicError()    { micError.textContent = '';            micError.style.display = 'none'; }
 
 function updateMicUI() {
   if (isListening) {
@@ -332,7 +392,6 @@ function startListening() {
   try { recognition.stop(); } catch (_) { /* ignore */ }
   recognition.start();
 }
-
 function stopListening() {
   if (!recognition) return;
   try { recognition.stop(); } catch (_) { /* ignore */ }
@@ -344,9 +403,7 @@ function initSpeech() {
   if (!SpeechRecognition) {
     btnMic.disabled = true;
     btnMic.title = 'Speech recognition not supported in this browser';
-    if (toggleAlwaysOn && toggleAlwaysOn.parentElement) {
-      toggleAlwaysOn.parentElement.style.display = 'none';
-    }
+    if (toggleAlwaysOn?.parentElement) toggleAlwaysOn.parentElement.style.display = 'none';
     return;
   }
 
@@ -357,26 +414,17 @@ function initSpeech() {
 
   let finalTranscript = '', interimTranscript = '';
 
-  recognition.onstart = () => {
-    isListening = true;
-    finalTranscript = interimTranscript = '';
-    updateMicUI();
-  };
-
-  recognition.onend = () => {
+  recognition.onstart = () => { isListening = true; finalTranscript = interimTranscript = ''; updateMicUI(); };
+  recognition.onend   = () => {
     isListening = false;
     updateMicUI();
     if (alwaysOn) setTimeout(() => { if (alwaysOn) startListening(); }, 300);
   };
-
   recognition.onerror = (event) => {
     isListening = false;
     updateMicUI();
-    if (event.error !== 'no-speech') {
-      showMicError(event.error || 'Microphone error. Please try again.');
-    }
+    if (event.error !== 'no-speech') showMicError(event.error || 'Microphone error. Please try again.');
   };
-
   recognition.onresult = (event) => {
     finalTranscript = interimTranscript = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -385,7 +433,6 @@ function initSpeech() {
       else           interimTranscript += r[0].transcript;
     }
     userQuery.value = finalTranscript + interimTranscript;
-
     if (event.results[event.results.length - 1].isFinal) {
       interimTranscript = '';
       userQuery.value   = finalTranscript.trim();
@@ -394,38 +441,27 @@ function initSpeech() {
     }
   };
 
-  // ── initCmdListener – TTS voice command mic ─────────────────────────────────
-  // Uses a second, independent SpeechRecognition instance with continuous=true
-  // so it stays open through the full audio playback without polling gaps.
+  // ── TTS voice command mic (dedicated continuous session) ──────────────────
   cmdRecognition = new SpeechRecognition();
-  cmdRecognition.continuous     = true;   // stay open; don't stop between phrases
-  cmdRecognition.interimResults = false;  // only act on settled results
+  cmdRecognition.continuous     = true;
+  cmdRecognition.interimResults = false;
   cmdRecognition.lang           = 'en-US';
 
   cmdRecognition.onstart = () => { cmdListening = true; };
   cmdRecognition.onend   = () => {
     cmdListening = false;
-    // If TTS is still active, restart the command listener automatically
-    if (ttsAudio && !ttsAudio.ended) {
-      setTimeout(() => {
-        if (ttsAudio && !ttsAudio.ended) startCmdListener();
-      }, 150);
-    }
+    if (ttsAudio && !ttsAudio.ended)
+      setTimeout(() => { if (ttsAudio && !ttsAudio.ended) startCmdListener(); }, 150);
   };
   cmdRecognition.onerror = (event) => {
     cmdListening = false;
-    // 'no-speech' and 'aborted' are expected; restart silently if TTS still running
-    if (ttsAudio && !ttsAudio.ended && event.error !== 'aborted') {
+    if (ttsAudio && !ttsAudio.ended && event.error !== 'aborted')
       setTimeout(() => startCmdListener(), 300);
-    }
   };
   cmdRecognition.onresult = (event) => {
     for (let i = event.resultIndex; i < event.results.length; i++) {
       if (!event.results[i].isFinal) continue;
-      const cmd = event.results[i][0].transcript
-        .toLowerCase()
-        .replace(/[^a-z ]/g, '')
-        .trim();
+      const cmd = event.results[i][0].transcript.toLowerCase().replace(/[^a-z ]/g, '').trim();
       if (cmd === 'play' || cmd === 'start') { ttsPlay();    break; }
       if (cmd === 'pause')                   { ttsPause();   break; }
       if (cmd === 'stop')                    { ttsStop();    break; }
@@ -438,7 +474,6 @@ function startCmdListener() {
   if (!cmdRecognition || cmdListening) return;
   try { cmdRecognition.start(); } catch (_) { /* already running */ }
 }
-
 function stopCmdListener() {
   if (!cmdRecognition) return;
   try { cmdRecognition.stop(); } catch (_) { /* ignore */ }
@@ -448,13 +483,8 @@ function stopCmdListener() {
 // ── Mic button / always-on toggle ─────────────────────────────────────────────
 btnMic.addEventListener('click', () => {
   hideMicError();
-  if (isListening) {
-    alwaysOn = false;
-    toggleAlwaysOn.checked = false;
-    stopListening();
-  } else {
-    startListening();
-  }
+  if (isListening) { alwaysOn = false; toggleAlwaysOn.checked = false; stopListening(); }
+  else             { startListening(); }
 });
 
 toggleAlwaysOn.addEventListener('change', () => {
@@ -476,48 +506,35 @@ function buildTtsScript(card) {
 }
 
 // ── TTS – core ────────────────────────────────────────────────────────────────
-
 async function ttsPlay() {
   if (ttsFetching) return;
-
-  // Resume paused audio without a new network request
   if (ttsAudio && ttsAudio.paused && ttsAudio.currentSrc) {
-    ttsAudio.play();
-    updateTtsUI('playing');
-    startCmdListener();
-    return;
+    ttsAudio.play(); updateTtsUI('playing'); startCmdListener(); return;
   }
-
-  // Already playing
   if (ttsAudio && !ttsAudio.paused) return;
-
   if (!ttsText) return;
+
   ttsFetching = true;
   updateTtsUI('loading');
-
   try {
     const res = await fetch('/tts', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ text: ttsText }),
     });
-
     if (!res.ok) {
       let detail = '';
       try { detail = (await res.json()).detail; } catch (_) { detail = await res.text(); }
       throw new Error('TTS error ' + res.status + ': ' + detail);
     }
-
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);
-
     if (ttsAudio) { ttsAudio.pause(); URL.revokeObjectURL(ttsAudio.src); }
-
     ttsAudio = new Audio(url);
     ttsAudio.onplay  = () => { updateTtsUI('playing'); startCmdListener(); };
-    ttsAudio.onpause = () => { updateTtsUI('paused');  /* keep cmd listener alive while paused */ };
-    ttsAudio.onended = () => { updateTtsUI('idle');    stopCmdListener(); };
-    ttsAudio.onerror = () => { updateTtsUI('idle');    stopCmdListener(); };
+    ttsAudio.onpause = () => { updateTtsUI('paused'); };
+    ttsAudio.onended = () => { updateTtsUI('idle');   stopCmdListener(); };
+    ttsAudio.onerror = () => { updateTtsUI('idle');   stopCmdListener(); };
     ttsAudio.play();
   } catch (err) {
     updateTtsUI('idle');
@@ -529,65 +546,25 @@ async function ttsPlay() {
   }
 }
 
-function ttsPause() {
-  if (ttsAudio && !ttsAudio.paused) ttsAudio.pause();
-  // cmd listener stays alive so user can say "play" to resume
-}
-
-function ttsStop() {
-  if (ttsAudio) {
-    ttsAudio.pause();
-    ttsAudio.currentTime = 0;
-  }
-  stopCmdListener();
-  updateTtsUI('idle');
-}
-
-function ttsRestart() {
-  if (ttsAudio) {
-    ttsAudio.pause();
-    URL.revokeObjectURL(ttsAudio.src);
-    ttsAudio = null;
-  }
-  stopCmdListener();
-  ttsPlay();
-}
-
-/** Full teardown – called on reset. */
-function ttsReset() {
-  if (ttsAudio) {
-    ttsAudio.pause();
-    URL.revokeObjectURL(ttsAudio.src);
-    ttsAudio = null;
-  }
-  stopCmdListener();
-  ttsText     = '';
-  ttsFetching = false;
-  updateTtsUI('hidden');
+function ttsPause()   { if (ttsAudio && !ttsAudio.paused) ttsAudio.pause(); }
+function ttsStop()    { if (ttsAudio) { ttsAudio.pause(); ttsAudio.currentTime = 0; } stopCmdListener(); updateTtsUI('idle'); }
+function ttsRestart() { if (ttsAudio) { ttsAudio.pause(); URL.revokeObjectURL(ttsAudio.src); ttsAudio = null; } stopCmdListener(); ttsPlay(); }
+function ttsReset()   {
+  if (ttsAudio) { ttsAudio.pause(); URL.revokeObjectURL(ttsAudio.src); ttsAudio = null; }
+  stopCmdListener(); ttsText = ''; ttsFetching = false; updateTtsUI('hidden');
 }
 
 // ── TTS – UI state machine ────────────────────────────────────────────────────
-/**
- * @param {'hidden'|'loading'|'playing'|'paused'|'idle'} state
- */
+/** @param {'hidden'|'loading'|'playing'|'paused'|'idle'} state */
 function updateTtsUI(state) {
   const show = (el, yes) => { el.style.display = yes ? '' : 'none'; };
-
-  if (state === 'hidden') {
-    ttsBar.style.display  = 'none';
-    ttsStatus.textContent = '';
-    return;
-  }
-
+  if (state === 'hidden') { ttsBar.style.display = 'none'; ttsStatus.textContent = ''; return; }
   ttsBar.style.display = '';
-
-  show(btnTtsPlay,    state === 'idle'  || state === 'paused' || state === 'loading');
+  show(btnTtsPlay,    state === 'idle' || state === 'paused' || state === 'loading');
   show(btnTtsPause,   state === 'playing');
   show(btnTtsStop,    state === 'playing' || state === 'paused');
   show(btnTtsRestart, state === 'playing' || state === 'paused' || state === 'idle');
-
   btnTtsPlay.disabled = state === 'loading';
-
   const labels = { loading: '⏳ Loading audio…', playing: '🔊 Playing…', paused: '⏸ Paused', idle: '' };
   ttsStatus.textContent = labels[state] ?? '';
 }
@@ -600,3 +577,4 @@ btnTtsRestart.addEventListener('click', () => ttsRestart());
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 initSpeech();
+initCamera();
