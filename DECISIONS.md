@@ -68,7 +68,7 @@ question. The root cause was a data-flow gap across three agents:
 - Integration: full pipeline (fake client) produces a direct answer
 - Guard: confirms a generic plan that ignores the question would fail the check
 
-## 2026-03-05
+## 2026-03-04
 
 ### Feature: ElevenLabs TTS audio output with voice command control
 
@@ -113,7 +113,7 @@ LIMITATIONS.md documents "Audio output is for convenience only."
 **New env vars:** `ELEVENLABS_API_KEY` (required, server-side only), `ELEVENLABS_VOICE_ID` (optional, defaults to Rachel `21m00Tcm4TlvDq8ikWAM`).
 **No new packages.** `httpx` 0.28.1 already present as a transitive dependency.
 
-## 2026-03-06
+## 2026-03-04
 
 ### Feature: Live camera frame capture
 
