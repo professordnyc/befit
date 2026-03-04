@@ -21,13 +21,13 @@ jobs:
         run: pip install uv
 
       - name: Sync dependencies with dev
-        run: uv sync --all-groups
+        run: uv sync --dev
 
       - name: Lint with ruff
-        run: uv tool run ruff check backend/ tests/
+        run: uv run ruff check backend/ tests/
 
       - name: Format check with black
-        run: uv tool run black --check backend/ tests/
+        run: uv run black --check backend/ tests/
 
       - name: Run tests
         run: uv run pytest tests/ -v
