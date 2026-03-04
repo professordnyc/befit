@@ -150,3 +150,6 @@ This structure is intended to support:
 - Multi-agent collaboration
 
 while keeping the system debuggable and safe for a wellness-oriented, non-diagnostic product.
+
+## Local Dev
+- Run Befit locally with uvicorn (uv run uvicorn backend.main:app --reload); do not rely on platform‑specific scripts like start.bat.

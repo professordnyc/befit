@@ -26,3 +26,15 @@ This file captures key product and technical decisions over time.
 - Chose OpenRouter + Anthropic Claude 3.5 Sonnet as default model (configurable via `BEFIT_MODEL`).
 - Chose FastAPI + uvicorn as the backend framework (async-native, matches Python preference).
 - Frontend is served as static files from the same FastAPI origin (no separate dev server required).
+
+## 2026-03-03
+
+- Removed `env.example` for environment variable documentation. 
+- Use `.env.example` for environment variable documentation with updated API details
+- Risk Checker subagent (risk_checker.py) remains deterministic over LLM‑based risk reasoning for safety, auditability, and alignment. 
+- OpenRouter _ Anthropic Claude Sonnet 4.6 as default model instead of deprecated model (Claude Sonnet 3.5)
+- Goose Opus-4.6 Sonnet-4.6 Lead-Worker configuration disabled to conserve tokens until bug is patched in Goose v1.26.x
+- Deployment: Netlify and Render with Postgres
+- Run Befit locally with uvicorn (uv run uvicorn backend.main:app --reload); do not rely on platform‑specific scripts like start.bat.
+
+
