@@ -725,3 +725,21 @@ body {
   transition: background var(--transition);
 }
 .btn-upload-label:hover { background: var(--color-info-bg); }
+
+/* Listen button (play from beginning) - accent tint distinguishes from resume/play */
+.tts-btn--listen {
+  background: var(--color-surface);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.tts-btn--listen:hover:not(:disabled) { background: var(--color-caution-bg); }
+
+/* Voice-commands hint row */
+.tts-voice-hint {
+  width: 100%;
+  font-size: .75rem;
+  color: var(--color-muted);
+  letter-spacing: .01em;
+  padding-top: .1rem;
+}
+@media (max-width: 420px) { .tts-voice-hint { display: none; } }

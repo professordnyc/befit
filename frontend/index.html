@@ -150,27 +150,28 @@
       <div class="tts-bar" id="tts-bar" style="display:none"
            role="group" aria-label="Listen to your plan">
         <button id="btn-tts-play" class="tts-btn tts-btn--play" type="button"
-                aria-label="Listen to plan">
-          <span class="tts-icon">🔊</span>
-          <span class="tts-label">Listen</span>
+                aria-label="Resume audio (say: play)">
+          <span class="tts-icon">▶️</span>
+          <span class="tts-label">Play</span>
         </button>
         <button id="btn-tts-pause" class="tts-btn" type="button"
-                aria-label="Pause audio" style="display:none">
+                aria-label="Pause audio (say: pause)" style="display:none">
           <span class="tts-icon">⏸</span>
           <span class="tts-label">Pause</span>
         </button>
         <button id="btn-tts-stop" class="tts-btn" type="button"
-                aria-label="Stop audio" style="display:none">
+                aria-label="Stop audio (say: stop)" style="display:none">
           <span class="tts-icon">⏹</span>
           <span class="tts-label">Stop</span>
         </button>
-        <button id="btn-tts-restart" class="tts-btn" type="button"
-                aria-label="Restart audio" style="display:none">
-          <span class="tts-icon">🔄</span>
-          <span class="tts-label">Restart</span>
+        <button id="btn-tts-restart" class="tts-btn tts-btn--listen" type="button"
+                aria-label="Listen from beginning (say: listen)" style="display:none">
+          <span class="tts-icon">🔊</span>
+          <span class="tts-label">Listen</span>
         </button>
         <span id="tts-status" class="tts-status"
               aria-live="polite" aria-atomic="true"></span>
+        <span class="tts-voice-hint" aria-hidden="true">Say: listen &bull; play &bull; pause &bull; stop</span>
       </div>
 
       <!-- Detected items -->

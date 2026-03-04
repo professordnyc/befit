@@ -427,10 +427,10 @@ function initSpeech() {
     if (ttsListening) {
       if (!last.isFinal) return;
       const cmd = last[0].transcript.toLowerCase().replace(/[^a-z ]/g, '').trim();
-      if      (cmd === 'play' || cmd === 'start') ttsPlay();
-      else if (cmd === 'pause')                   ttsPause();
-      else if (cmd === 'stop')                    ttsStop();
-      else if (cmd === 'restart')                 ttsRestart();
+      if      (cmd === 'listen' || cmd === 'restart') ttsRestart();
+      else if (cmd === 'play'   || cmd === 'start')  ttsPlay();
+      else if (cmd === 'pause')                       ttsPause();
+      else if (cmd === 'stop')                        ttsStop();
       // Re-arm for next command if audio still active
       ttsListening = false;
       if (ttsAudio && !ttsAudio.ended) setTimeout(startCmdListener, 200);
