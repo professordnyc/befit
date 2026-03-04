@@ -169,3 +169,4 @@ while keeping the system debuggable and safe for a wellness-oriented, non-diagno
 - The "Capture" button snapshots the live frame; the resulting base-64 JPEG is sent to `/scan-and-plan` identically to an uploaded file.
 - "Retake" restarts the camera stream so the user can reframe before capturing again.
 - If camera access is denied or unavailable, a descriptive error is shown and the "Upload image" fallback remains accessible.
+- **Boot order:** `initCamera().then(initSpeech)` — speech recognition is initialised only after the camera `getUserMedia` promise resolves, preventing Chromium from silently invalidating the `SpeechRecognition` instance during permission grant.

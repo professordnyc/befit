@@ -113,25 +113,69 @@ LIMITATIONS.md documents "Audio output is for convenience only."
 **New env vars:** `ELEVENLABS_API_KEY` (required, server-side only), `ELEVENLABS_VOICE_ID` (optional, defaults to Rachel `21m00Tcm4TlvDq8ikWAM`).
 **No new packages.** `httpx` 0.28.1 already present as a transitive dependency.
 
-## 2026-03-04
+## 2026-03-06
 
 ### Feature: Live camera frame capture
 
-**Rationale:** AGENTS.md Vision Interpreter spec states it must "take in uploaded or live video frame and mobile camera input." README.md lists live-frame handling as a key feature. This replaces the tap-to-upload area with an active camera feed that starts on page load.
+**Rationale:** AGENTS.md Vision Interpreter spec requires "live video frame and mobile camera
+input." This replaces the static tap-to-upload area with an active camera feed on page load.
 
 **Files changed (3, frontend only — backend unchanged):**
 
-- `frontend/index.html` – Replaced static upload area with a `<video>` live camera feed (`#camera-container`) plus a "Capture" button, a "Switch camera" button (shown only when multiple cameras are detected), a captured/uploaded preview block (`#preview-container`) with a "Retake" overlay button, a camera error banner, and an "Upload image" fallback label that is always visible.
+- `frontend/index.html` – Replaced upload area with `<video>` live feed (`#camera-container`),
+  Capture button, Switch camera button (shown only when > 1 camera detected), captured/uploaded
+  preview block (`#preview-container`) with Retake overlay button, camera error banner, and
+  always-visible "Upload image" fallback.
 
 - `frontend/app.js` – Added camera module:
-  - `initCamera()` – enumerates videoinput devices, shows "Switch camera" if > 1, calls `startCamera()`.
-  - `startCamera(deviceId)` – requests `facingMode: environment` (rear) by default; falls back to any camera if no deviceId given; sets `<video>.srcObject`.
-  - `captureFrame()` – draws `<video>` frame onto an off-screen `<canvas>`, encodes as JPEG base-64 (quality 0.85), stops the stream, shows preview. Same `imageDataUri` path used by existing upload flow.
-  - `retake()` – clears captured image and restarts camera.
-  - File upload listener updated to stop stream before showing preview.
-  - Full reset (`btn-reset`) now calls `initCamera()` to restart the feed.
-  - No backend changes required; `/scan-and-plan` already accepts base-64 `image_url`.
+  - `initCamera()` – enumerates videoinput devices; shows Switch button if > 1; calls `startCamera()`.
+  - `startCamera(deviceId)` – requests `facingMode: environment` (rear) by default; sets `<video>.srcObject`.
+  - `captureFrame()` – draws video frame to off-screen `<canvas>`, encodes JPEG base-64 (quality 0.85),
+    stops stream, shows preview. Uses the same `imageDataUri` path as file upload.
+  - `retake()` – clears capture and restarts camera.
+  - Full reset (`btn-reset`) calls `initCamera()` to restart the feed.
 
-- `frontend/style.css` – Appended camera-specific rules using existing design tokens: `.camera-container`, `.camera-feed`, `.camera-overlay`, `.camera-hint`, `.camera-controls`, `.btn-capture` (≥ 48 px tap target), `.btn-icon-sm` (switch camera, ≥ 44 px), `.preview-container`, `.btn-retake`, `.camera-error`, `.upload-toolbar`, `.btn-upload-label`.
+- `frontend/style.css` – Appended camera rules using existing design tokens: hint pill (top-left,
+  frosted glass), controls bar (bottom gradient scrim, Capture right-aligned, ≥ 48 px tap target),
+  preview container, Retake overlay button, camera error banner, upload toolbar/fallback label.
 
 **No new packages, no backend changes, no API key changes.**
+
+### Fix: Camera hint and Capture button layout collision
+
+**Problem:** Both the hint text and Capture button were positioned in the bottom area of the
+camera feed, overlapping at narrow widths.
+
+**Fix:** Moved hint text to a frosted-glass pill in the top-left corner. Camera controls bar
+now spans the full bottom edge with a gradient scrim; Capture button is right-aligned inside it.
+Also changed toggle focus ring from `:focus-within` to `:has(input:focus-visible)` so the
+accent-colour outline only appears on keyboard navigation, not on page load or mouse focus.
+
+**File changed:** `frontend/style.css` only.
+
+### Fix: Voice input disabled after camera permission grant (Chromium)
+
+**Problem:** `initSpeech()` and `initCamera()` were called in parallel at boot.
+When `getUserMedia` resolved and Chromium updated the page's permission context,
+any `SpeechRecognition` instance created before that moment was silently invalidated —
+leaving the mic button unresponsive with no visible error.
+
+**Fix:** Deferred `initSpeech()` until `initCamera()` resolves:
+
+```js
+// Before
+initSpeech();
+initCamera();
+
+// After
+initCamera().then(initSpeech);
+```
+
+**File changed:** `frontend/app.js` (boot section only).
+
+### Diagnostic: camera-test.html (temporary, now removed)
+
+A self-contained `/camera-test` page was added to diagnose camera and microphone permission
+issues. It tested `getUserMedia` (video + audio), device enumeration, track state, and a live
+`SpeechRecognition` round-trip. Confirmed working; route and file removed after testing.
+`backend/main.py` route and `frontend/camera-test.html` both deleted before final commit.
