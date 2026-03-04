@@ -576,5 +576,5 @@ btnTtsStop.addEventListener('click',    () => ttsStop());
 btnTtsRestart.addEventListener('click', () => ttsRestart());
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-initSpeech();
-initCamera();
+// Camera getUserMedia must resolve before SpeechRecognition init (Chromium permission sequencing).
+initCamera().then(initSpeech);
