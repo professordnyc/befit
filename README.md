@@ -17,7 +17,7 @@ it into a simple "Today's Plan" of safe, achievable actions.
 
 1. **Clone & set up:**
    ```bash
-   git clone https://github.com/your-org/befit.git
+   git clone https://github.com/professordnyc/befit.git
    cd befit
    cp .env.example .env
    ```
@@ -76,7 +76,7 @@ Befit follows a hierarchical agent orchestration pattern (see [AGENTS.md](AGENTS
 
 4. **Set environment variables** in Render dashboard:
    - `BEFIT_ENV=production`
-   - `OPENAI_API_KEY=<your-key>`
+   - `OPENAI_API_KEY=<your-key>` #openrouter for goose
    - `ELEVENLABS_API_KEY=<your-key>` (optional)
    - `OPENAI_BASE_URL=https://openrouter.ai/api/v1`
 

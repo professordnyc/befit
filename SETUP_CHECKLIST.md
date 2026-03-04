@@ -55,7 +55,7 @@
    git init  # if not already initialized
    git add .
    git commit -m "Initial commit: Befit wellness assistant"
-   git remote add origin https://github.com/YOUR_USERNAME/befit.git
+   git remote add origin https://github.com/professordnyc/befit.git
    git branch -M main
    git push -u origin main
    ```
@@ -82,7 +82,7 @@
 4. **Environment variables:**
    ```
    BEFIT_ENV=production
-   OPENAI_API_KEY=your-openrouter-key
+   OPENAI_API_KEY=your-openrouter-key #open router key for Goose 
    ELEVENLABS_API_KEY=your-elevenlabs-key
    OPENAI_BASE_URL=https://openrouter.ai/api/v1
    ```
