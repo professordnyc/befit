@@ -21,7 +21,7 @@ jobs:
         run: pip install uv
 
       - name: Sync dependencies with dev
-        run: uv sync --dev
+        run: uv sync --all-groups
 
       - name: Lint with ruff
         run: uv run ruff check backend/ tests/
