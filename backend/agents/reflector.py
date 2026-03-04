@@ -72,12 +72,15 @@ async def run(
     """
     logger.info("Reflector: reviewing draft plan")
 
-    payload = json.dumps({
-        "user_question": intent.get("user_question", ""),
-        "draft": draft,
-        "detected_items": [i.model_dump() for i in items],
-        "risk_flags": [f.model_dump() for f in risk_flags],
-    }, indent=2)
+    payload = json.dumps(
+        {
+            "user_question": intent.get("user_question", ""),
+            "draft": draft,
+            "detected_items": [i.model_dump() for i in items],
+            "risk_flags": [f.model_dump() for f in risk_flags],
+        },
+        indent=2,
+    )
 
     response = await client.chat.completions.create(
         model=model,
@@ -95,7 +98,9 @@ async def run(
     try:
         revised = json.loads(raw)
     except json.JSONDecodeError:
-        logger.warning("Reflector: could not parse JSON, returning original draft. Raw: %s", raw[:300])
+        logger.warning(
+            "Reflector: could not parse JSON, returning original draft. Raw: %s", raw[:300]
+        )
         revised = draft
 
     logger.info("Reflector: review complete")

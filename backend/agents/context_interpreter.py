@@ -62,7 +62,9 @@ async def run(
 
     context_snippet = ""
     if user_context:
-        context_snippet = f"\n\nAdditional context provided by the app:\n{json.dumps(user_context, indent=2)}"
+        context_snippet = (
+            f"\n\nAdditional context provided by the app:\n{json.dumps(user_context, indent=2)}"
+        )
 
     response = await client.chat.completions.create(
         model=model,
@@ -85,7 +87,9 @@ async def run(
         # Always preserve the verbatim user question so downstream agents can answer it directly
         intent.setdefault("user_question", user_query)
     except json.JSONDecodeError:
-        logger.warning("ContextInterpreter: could not parse JSON, using defaults. Raw: %s", raw[:200])
+        logger.warning(
+            "ContextInterpreter: could not parse JSON, using defaults. Raw: %s", raw[:200]
+        )
         intent = {
             "goal": "general health",
             "person": "unknown",

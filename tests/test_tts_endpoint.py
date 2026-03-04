@@ -14,10 +14,10 @@ import types
 import pytest
 from fastapi.testclient import TestClient
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_mock_response(status_code: int, content: bytes = b"", text: str = ""):
     """Return a minimal httpx-Response-like object."""
@@ -32,6 +32,7 @@ def _make_mock_response(status_code: int, content: bytes = b"", text: str = ""):
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def tts_client(monkeypatch):
     """
@@ -39,6 +40,7 @@ def tts_client(monkeypatch):
     Patches directly on backend.main so load_dotenv cannot override it.
     """
     import backend.main as m
+
     monkeypatch.setattr(m, "ELEVENLABS_API_KEY", "test-key-123")
     return TestClient(m.app)
 
@@ -51,6 +53,7 @@ def tts_client_no_key(monkeypatch):
     repopulate it from .env during the test.
     """
     import backend.main as m
+
     monkeypatch.setattr(m, "ELEVENLABS_API_KEY", "")
     return TestClient(m.app)
 
@@ -58,6 +61,7 @@ def tts_client_no_key(monkeypatch):
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 def test_tts_happy_path(tts_client, monkeypatch):
     """POST /tts with valid text returns 200 audio/mpeg."""
@@ -67,14 +71,15 @@ def test_tts_happy_path(tts_client, monkeypatch):
         return _make_mock_response(200, content=fake_audio)
 
     import httpx
+
     monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
 
     resp = tts_client.post("/tts", json={"text": "Hello, this is your wellness plan."})
 
     assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
-    assert resp.headers["content-type"].startswith("audio/mpeg"), (
-        f"Expected audio/mpeg, got {resp.headers['content-type']}"
-    )
+    assert resp.headers["content-type"].startswith(
+        "audio/mpeg"
+    ), f"Expected audio/mpeg, got {resp.headers['content-type']}"
     assert resp.content == fake_audio
 
 
@@ -93,10 +98,12 @@ def test_tts_missing_api_key_returns_503(tts_client_no_key):
 
 def test_tts_upstream_error_returns_502(tts_client, monkeypatch):
     """When ElevenLabs returns non-200, /tts returns 502."""
+
     async def fake_post(self, *args, **kwargs):
         return _make_mock_response(401, text="Unauthorized")
 
     import httpx
+
     monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
 
     resp = tts_client.post("/tts", json={"text": "Some text"})
@@ -112,6 +119,7 @@ def test_tts_text_capped_at_2500_chars(tts_client, monkeypatch):
         return _make_mock_response(200, content=b"fake-audio")
 
     import httpx
+
     monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
 
     resp = tts_client.post("/tts", json={"text": "a" * 4000})

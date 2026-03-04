@@ -86,7 +86,9 @@ async def run(client: AsyncOpenAI, image_url: str, model: str) -> List[DetectedI
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        logger.warning("VisionInterpreter: could not parse JSON, returning empty list. Raw: %s", raw[:200])
+        logger.warning(
+            "VisionInterpreter: could not parse JSON, returning empty list. Raw: %s", raw[:200]
+        )
         data = []
 
     items = []

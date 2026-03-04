@@ -17,7 +17,7 @@ import logging
 from typing import List
 
 from openai import AsyncOpenAI
-from ..schemas import DetectedItem, RiskFlag, Action
+from ..schemas import DetectedItem, RiskFlag
 
 logger = logging.getLogger(__name__)
 
@@ -84,11 +84,14 @@ async def run(
     items_payload = [i.model_dump() for i in items]
     flags_payload = [f.model_dump() for f in risk_flags]
 
-    user_message = json.dumps({
-        "detected_items": items_payload,
-        "intent": intent,
-        "risk_flags": flags_payload,
-    }, indent=2)
+    user_message = json.dumps(
+        {
+            "detected_items": items_payload,
+            "intent": intent,
+            "risk_flags": flags_payload,
+        },
+        indent=2,
+    )
 
     response = await client.chat.completions.create(
         model=model,

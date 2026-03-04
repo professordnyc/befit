@@ -51,14 +51,14 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 load_dotenv()
 
-API_KEY      = os.getenv("OPENAI_API_KEY", "")
-BASE_URL     = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
-MODEL        = os.getenv("BEFIT_MODEL", "anthropic/claude-sonnet-4-6")
+API_KEY = os.getenv("OPENAI_API_KEY", "")
+BASE_URL = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+MODEL = os.getenv("BEFIT_MODEL", "anthropic/claude-sonnet-4-6")
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",")]
 
-ELEVENLABS_API_KEY  = os.getenv("ELEVENLABS_API_KEY", "")
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")  # Rachel
-ELEVENLABS_TTS_URL  = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
+ELEVENLABS_TTS_URL = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
 
 if not API_KEY:
     logger.warning("OPENAI_API_KEY is not set — LLM calls will fail at runtime.")
@@ -90,13 +90,12 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Frontend path
 # ---------------------------------------------------------------------------
-FRONTEND_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "frontend")
-)
+FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
 
 # ---------------------------------------------------------------------------
 # API routes  (must be declared BEFORE the catch-all static mount)
 # ---------------------------------------------------------------------------
+
 
 @app.get("/health")
 async def health():

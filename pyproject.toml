@@ -28,8 +28,8 @@ dev = [
     "ruff==0.1.8",
 ]
 
-[tool.uv]
-python-versions = ">=3.10"
+[tool.hatch.build.targets.wheel]
+packages = ["backend"]
 
 [tool.ruff]
 line-length = 100
