@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: befit-backend
+    runtime: python
+    startCommand: "uv run uvicorn backend.main:app"
+    plan: free
+    preDeployCommand: "uv sync"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: BEFIT_ENV
+        value: production
