@@ -19,10 +19,14 @@ entry_points:
 
 preferences:
   # Always understand the agent team before proposing workflows.
-  - Read AGENTS.md before designing or modifying agent orchestration.
+  - Read AGENTS.md before designing or modifying agent orchestration. 
+  - Consider the entry points in this file as the primary sources of truth for how to contribute effectively to Befit, especially AGENTS.md for agent collaboration and DECISIONS.md for design rationale.
+  - README.md is for high-level project overview and setup; AGENTS.md is for understanding agent roles and collaboration; DECISIONS.md is for understanding design choices and rationale. Always consult these before proposing changes.
+  - Read DECISIONS.md to understand past decisions and rationale before proposing changes. Do not guess, Ask if unsure.
   - Prefer using existing recipes (YAML files) and where relevant skills in the skills/ directory over ad-hoc prompting.
   - Respect and consult RISK_LOG.md and any LIMITATIONS.md when generating health-related outputs.
   - Run Befit locally with uvicorn (uv run uvicorn backend.main:app --reload); do not rely on platform‑specific scripts like start.bat.
+  - Remember to remove any temporary files or data generated during testing or troubleshooting to maintain a clean working environment.
 logging_and_docs:
   - When asked to update documentation, prefer appending to existing logs (RISK_LOG.md, EVIDENCE_LOG.md, DECISIONS.md) rather than rewriting history.
   - When proposing code changes that affect agents, recipes or skills, also suggest updates to AGENTS.md, recipes and related SKILL.md files.

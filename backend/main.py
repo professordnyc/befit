@@ -11,7 +11,7 @@ Endpoints:
 Configuration is read from environment variables (or a .env file via python-dotenv):
   OPENAI_API_KEY   – required (use your OpenRouter key or OpenAI key)
   OPENAI_BASE_URL  – optional, defaults to https://openrouter.ai/api/v1
-  BEFIT_MODEL      – optional, defaults to anthropic/claude-3-5-sonnet
+  BEFIT_MODEL      – optional, defaults to anthropic/claude-sonnet-4-6
   ALLOWED_ORIGINS  – optional comma-separated CORS origins, defaults to *
 """
 
@@ -45,7 +45,7 @@ load_dotenv()
 
 API_KEY = os.getenv("OPENAI_API_KEY", "")
 BASE_URL = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
-MODEL = os.getenv("BEFIT_MODEL", "anthropic/claude-3-5-sonnet")
+MODEL = os.getenv("BEFIT_MODEL", "anthropic/claude-sonnet-4-6")
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",")]
 
 if not API_KEY:
