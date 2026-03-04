@@ -24,10 +24,10 @@ jobs:
         run: uv sync --all-groups
 
       - name: Lint with ruff
-        run: uv run ruff check backend/ tests/
+        run: uv tool run ruff check backend/ tests/
 
       - name: Format check with black
-        run: uv run black --check backend/ tests/
+        run: uv tool run black --check backend/ tests/
 
       - name: Run tests
         run: uv run pytest tests/ -v
