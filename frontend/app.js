@@ -3,7 +3,7 @@
  *
  * Flow:
  *   1. User picks / drags an image  → stored as base-64 data URI
- *   2. User types a wellness question
+ *   2. User types (or speaks) a wellness question
  *   3. Submit → POST /scan-and-plan → today_card JSON
  *   4. Render card into DOM
  */
@@ -36,8 +36,20 @@ const tcLimitations  = document.getElementById('tc-limitations');
 const tcItemsSection = document.getElementById('tc-items-section');
 const tcFlagsSection = document.getElementById('tc-flags-section');
 
+// ── Voice / STT DOM refs ─────────────────────────────────────────────────────
+const btnMic         = document.getElementById('btn-mic');
+const micIcon        = document.getElementById('mic-icon');
+const toggleAlwaysOn = document.getElementById('toggle-always-on');
+const micStatus      = document.getElementById('mic-status');
+const micError       = document.getElementById('mic-error');
+
 // ── State ────────────────────────────────────────────────────────────────────
 let imageDataUri = null;
+
+// ── Voice / STT state ────────────────────────────────────────────────────────
+let recognition  = null;   // SpeechRecognition instance
+let isListening  = false;  // is mic currently active?
+let alwaysOn     = false;  // always-on mode
 
 // ── Image selection ──────────────────────────────────────────────────────────
 uploadArea.addEventListener('click', () => fileInput.click());
@@ -217,9 +229,14 @@ btnResetQuery.addEventListener('click', () => {
   ctxConstraints.value = '';
   hideError();
   updateSubmitState();
+  // Reset mic state
+  alwaysOn = false;
+  toggleAlwaysOn.checked = false;
+  stopListening();
+  hideMicError();
+  updateMicUI();
   userQuery.focus();
 });
-
 
 // ── Reset ─────────────────────────────────────────────────────────────────────
 btnReset.addEventListener('click', () => {
@@ -235,6 +252,13 @@ btnReset.addEventListener('click', () => {
   todayCardEl.style.display = 'none';
   hideError();
   updateSubmitState();
+  // Reset mic state
+  alwaysOn = false;
+  toggleAlwaysOn.checked = false;
+  stopListening();
+  hideMicError();
+  micStatus.textContent = '';
+  updateMicUI();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
@@ -262,3 +286,145 @@ function esc(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+// ── Voice / STT helpers ───────────────────────────────────────────────────────
+function showMicError(msg) {
+  micError.textContent = '🎤 ' + msg;
+  micError.style.display = '';
+}
+function hideMicError() {
+  micError.textContent = '';
+  micError.style.display = 'none';
+}
+
+// ── updateMicUI ───────────────────────────────────────────────────────────────
+function updateMicUI() {
+  if (isListening) {
+    btnMic.setAttribute('aria-pressed', 'true');
+    btnMic.classList.add('mic-active');
+    micIcon.textContent = '⏹️';
+    btnMic.setAttribute('aria-label', 'Stop voice input');
+    micStatus.textContent = 'Listening…';
+  } else {
+    btnMic.setAttribute('aria-pressed', 'false');
+    btnMic.classList.remove('mic-active');
+    micIcon.textContent = '🎤';
+    btnMic.setAttribute('aria-label', 'Start voice input');
+    micStatus.textContent = '';
+  }
+}
+
+// ── startListening / stopListening ────────────────────────────────────────────
+function startListening() {
+  if (!recognition) return;
+  // Stop any existing session before starting a fresh one
+  try { recognition.stop(); } catch (_) { /* ignore */ }
+  recognition.start();
+}
+
+function stopListening() {
+  if (!recognition) return;
+  try { recognition.stop(); } catch (_) { /* ignore */ }
+}
+
+// ── initSpeech ────────────────────────────────────────────────────────────────
+function initSpeech() {
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    btnMic.disabled = true;
+    btnMic.title = 'Speech recognition not supported in this browser';
+    // Hide the always-on toggle row
+    if (toggleAlwaysOn && toggleAlwaysOn.parentElement) {
+      toggleAlwaysOn.parentElement.style.display = 'none';
+    }
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.continuous     = false;
+  recognition.interimResults = true;
+  recognition.lang           = 'en-US';
+
+  // Track interim vs. final transcripts within a session
+  let finalTranscript   = '';
+  let interimTranscript = '';
+
+  recognition.onstart = () => {
+    isListening       = true;
+    finalTranscript   = '';
+    interimTranscript = '';
+    updateMicUI();
+  };
+
+  recognition.onend = () => {
+    isListening = false;
+    updateMicUI();
+    // If always-on is still active, restart after a short delay
+    if (alwaysOn) {
+      setTimeout(() => {
+        if (alwaysOn) startListening();
+      }, 300);
+    }
+  };
+
+  recognition.onerror = (event) => {
+    isListening = false;
+    updateMicUI();
+    // 'no-speech' is expected in always-on mode; fail silently
+    if (event.error !== 'no-speech') {
+      showMicError(event.error || 'Microphone error. Please try again.');
+    }
+  };
+
+  recognition.onresult = (event) => {
+    finalTranscript   = '';
+    interimTranscript = '';
+
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const result = event.results[i];
+      if (result.isFinal) {
+        finalTranscript += result[0].transcript;
+      } else {
+        interimTranscript += result[0].transcript;
+      }
+    }
+
+    // Show combined text live in the textarea
+    userQuery.value = finalTranscript + interimTranscript;
+
+    // On a truly final result (last result is final), settle the value
+    if (event.results[event.results.length - 1].isFinal) {
+      interimTranscript = '';
+      userQuery.value   = finalTranscript.trim();
+      updateSubmitState();
+      hideMicError();
+    }
+  };
+}
+
+// ── Mic button click handler ──────────────────────────────────────────────────
+btnMic.addEventListener('click', () => {
+  hideMicError();
+  if (isListening) {
+    alwaysOn = false;          // clicking stop always disables always-on too
+    toggleAlwaysOn.checked = false;
+    stopListening();
+  } else {
+    startListening();
+  }
+});
+
+// ── Always-on toggle handler ──────────────────────────────────────────────────
+toggleAlwaysOn.addEventListener('change', () => {
+  alwaysOn = toggleAlwaysOn.checked;
+  if (alwaysOn && !isListening) {
+    startListening();
+  } else if (!alwaysOn && isListening) {
+    stopListening();
+  }
+});
+
+// ── Initialise speech on load ─────────────────────────────────────────────────
+initSpeech();

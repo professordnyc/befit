@@ -49,9 +49,31 @@
         id="user-query"
         class="query-input"
         rows="3"
-        placeholder='e.g. "I want to support my blood pressure" or "What's a quick healthy lunch from what I have?"'
+        placeholder='e.g. "I want to support my blood pressure" or "What&apos;s a quick healthy lunch from what I have?"'
         aria-label="Your wellness question"
       ></textarea>
+
+      <!-- Voice input toolbar -->
+      <div class="voice-toolbar">
+        <button id="btn-mic" type="button"
+                aria-label="Start voice input"
+                aria-pressed="false">
+          <span id="mic-icon">🎙️</span>
+        </button>
+
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-always-on"
+                 role="switch"
+                 aria-label="Keep microphone always on" />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">Always-on mic</span>
+        </label>
+
+        <span id="mic-status" class="mic-status"
+              aria-live="polite" aria-atomic="true"></span>
+      </div>
+
+      <div id="mic-error" class="mic-error" role="alert" style="display:none"></div>
 
       <!-- Optional context toggles -->
       <details class="context-details">
