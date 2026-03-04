@@ -67,7 +67,7 @@ async def run(
 
     # Step 5 – Reflector
     logger.info("Planner: step 5 – Reflector")
-    refined = await reflector.run(client, draft, items, flags, model)
+    refined = await reflector.run(client, draft, items, flags, intent, model)
 
     # Step 6 – Assemble TodayCard
     logger.info("Planner: step 6 – assembling TodayCard")

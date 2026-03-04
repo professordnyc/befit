@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = """You are the Befit Reflector — a safety and quality reviewer for wellness guidance.
 
 You will receive:
+  - The user's original question.
   - A draft Today's Plan card (goal_summary, actions, why, limitations).
   - The detected items that informed the plan.
   - The risk flags raised by the Risk Checker.
@@ -34,6 +35,9 @@ Your job is to review and improve the draft so that:
   3. The "limitations" field is prominent and accurate.
   4. Language is warm, empathetic, and non-judgmental.
   5. Any over-confident or unsafe claims are softened or removed.
+  6. The first action must directly answer the "user_question" field if it contains a specific question.
+     If the question is not answered (e.g. user asked "can I eat these raw?" but actions only suggest recipes),
+     revise the first action to give a clear, direct answer based on the detected items.
 
 Return the REVISED draft as a JSON object with exactly the same keys:
   goal_summary, actions (each with title + description), why, limitations.
@@ -47,16 +51,29 @@ async def run(
     draft: dict,
     items: List[DetectedItem],
     risk_flags: List[RiskFlag],
+    intent: dict,
     model: str,
 ) -> dict:
     """
     Review and refine the Plan Writer draft.
 
-    Returns the revised dict with the same shape as the draft.
+    Parameters
+    ----------
+    client     : Async OpenAI-compatible client.
+    draft      : Plan Writer output dict.
+    items      : Detected items from the Vision Interpreter.
+    risk_flags : Risk flags from the Risk Checker.
+    intent     : Intent dict from the Context Interpreter, including user_question.
+    model      : LLM model identifier.
+
+    Returns
+    -------
+    The revised dict with the same shape as the draft.
     """
     logger.info("Reflector: reviewing draft plan")
 
     payload = json.dumps({
+        "user_question": intent.get("user_question", ""),
         "draft": draft,
         "detected_items": [i.model_dump() for i in items],
         "risk_flags": [f.model_dump() for f in risk_flags],

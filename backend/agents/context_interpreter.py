@@ -25,6 +25,7 @@ Given the user's question and any optional context, return a JSON object with:
   - person: who the advice is for ("self", "elder", "family", "unknown")
   - constraints: list of relevant constraints explicitly mentioned (e.g. ["vegetarian", "low-sodium"])
   - notes: any conservative assumptions you had to make because info was missing
+  - user_question: the user's original question, copied verbatim (string)
 
 Rules:
   - Do NOT invent medical history.
@@ -36,7 +37,8 @@ Example:
   "goal": "blood pressure",
   "person": "self",
   "constraints": ["low-sodium"],
-  "notes": "No allergy info provided; assumed none."
+  "notes": "No allergy info provided; assumed none.",
+  "user_question": "What should I eat today to help my blood pressure?"
 }"""
 
 
@@ -80,6 +82,8 @@ async def run(
 
     try:
         intent = json.loads(raw)
+        # Always preserve the verbatim user question so downstream agents can answer it directly
+        intent.setdefault("user_question", user_query)
     except json.JSONDecodeError:
         logger.warning("ContextInterpreter: could not parse JSON, using defaults. Raw: %s", raw[:200])
         intent = {
@@ -87,6 +91,7 @@ async def run(
             "person": "unknown",
             "constraints": [],
             "notes": "Could not parse intent; conservative defaults applied.",
+            "user_question": user_query,
         }
 
     logger.info("ContextInterpreter: intent = %s", intent)
