@@ -104,9 +104,8 @@ Workflows run automatically on every push:
 - **deploy.yml:** Trigger Render & Netlify deployments on main branch push
 
 Configure these secrets in GitHub repo settings:
-- `RENDER_SERVICE_ID`: Copy from Render dashboard
-- `RENDER_API_KEY`: Create from Render account settings
-- `NETLIFY_BUILD_HOOK`: Copy from Netlify deploy settings
+- `RENDER_DEPLOY_HOOK_URL`: Render dashboard → Web Service → Settings → Deploy Hook
+- `NETLIFY_BUILD_HOOK_URL`: Netlify → Site settings → Build & deploy → Build hooks (add when Netlify is set up)
 
 ---
 

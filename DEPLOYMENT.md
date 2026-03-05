@@ -14,9 +14,9 @@ git init
 git add .
 git commit -m "Initial commit: Befit wellness assistant"
 
-# Create a new repository on GitHub at https://github.com/your-org/befit
+# Create a new repository on GitHub at https://github.com/professordnyc/befit
 # Then push:
-git remote add origin https://github.com/your-org/befit.git
+git remote add origin https://github.com/professordnyc/befit.git
 git branch -M main
 git push -u origin main
 ```
@@ -34,7 +34,7 @@ git push -u origin main
 ### 2b. Configure Web Service
 - **Name:** `befit-backend`
 - **Environment:** `Python 3`
-- **Build Command:** `uv sync`
+- **Build Command:** `uv sync --all-groups`
 - **Start Command:** `uv run uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
 - **Plan:** Free (or paid for production)
 
@@ -100,9 +100,8 @@ Add these secrets:
 
 | Secret Name | Value | Where to Find |
 |---|---|---|
-| `RENDER_SERVICE_ID` | Your Render service ID | Render dashboard → Web Service → Settings |
-| `RENDER_API_KEY` | Your Render API key | https://dashboard.render.com/account/api-tokens |
-| `NETLIFY_BUILD_HOOK` | Netlify build hook URL | Netlify → Site settings → Build & deploy → Build hooks |
+| `RENDER_DEPLOY_HOOK_URL` | Render deploy hook URL | Render dashboard → Web Service → Settings → Deploy Hook |
+| `NETLIFY_BUILD_HOOK_URL` | Netlify build hook URL | Netlify → Site settings → Build & deploy → Build hooks (add when Netlify is set up) |
 
 ### 4b. Workflows
 The following GitHub Actions run automatically:
