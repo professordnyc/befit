@@ -39,21 +39,29 @@ jobs:
   deploy-render:
     needs: test
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/main' && secrets.RENDER_DEPLOY_HOOK_URL != '' }}
 
     steps:
       - name: Trigger Render deployment
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
-          curl --silent --show-error --fail --request POST \
-            "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+          if [ -z "${RENDER_DEPLOY_HOOK_URL}" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL not set — skipping Render deploy."
+            exit 0
+          fi
+          curl --silent --show-error --fail --request POST "${RENDER_DEPLOY_HOOK_URL}"
 
   deploy-netlify:
     needs: test
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/main' && secrets.NETLIFY_BUILD_HOOK_URL != '' }}
 
     steps:
       - name: Trigger Netlify deployment
+        env:
+          NETLIFY_BUILD_HOOK_URL: ${{ secrets.NETLIFY_BUILD_HOOK_URL }}
         run: |
-          curl --silent --show-error --fail --request POST \
-            "${{ secrets.NETLIFY_BUILD_HOOK_URL }}"
+          if [ -z "${NETLIFY_BUILD_HOOK_URL}" ]; then
+            echo "NETLIFY_BUILD_HOOK_URL not set — skipping Netlify deploy."
+            exit 0
+          fi
+          curl --silent --show-error --fail --request POST "${NETLIFY_BUILD_HOOK_URL}"
