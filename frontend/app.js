@@ -488,7 +488,7 @@ function initSpeech() {
       else if (cmd === 'pause')                       ttsPause();
       else if (cmd === 'stop')                        ttsStop();
       ttsListening = false;
-      if ((ttsAudio && !ttsAudio.ended) || ttsUsingWebSpeech) setTimeout(startCmdListener, 200);
+      if (ttsAudio !== null || ttsUsingWebSpeech) setTimeout(startCmdListener, 200);
       return;
     }
     finalTranscript = interimTranscript = '';
@@ -576,7 +576,7 @@ async function ttsPlay() {
   if (ttsUsingWebSpeech) { webSpeechResume(); return; }
 
   // Resume HTMLAudio if paused
-  if (ttsAudio && ttsAudio.paused && ttsAudio.currentSrc) {
+  if (ttsAudio && ttsAudio.paused && !ttsAudio.ended && ttsAudio.currentSrc) {
     ttsAudio.play(); updateTtsUI('playing'); startCmdListener(); return;
   }
   if (ttsAudio && !ttsAudio.paused) return;
@@ -630,7 +630,12 @@ function ttsPause() {
 
 function ttsStop() {
   if (ttsUsingWebSpeech) { webSpeechStop(); return; }
-  if (ttsAudio) { ttsAudio.pause(); ttsAudio.currentTime = 0; }
+  if (ttsAudio) {
+    ttsAudio.onpause = null;           // detach handler to prevent paused-UI flicker
+    ttsAudio.pause();
+    URL.revokeObjectURL(ttsAudio.src); // release blob memory
+    ttsAudio = null;                   // null → stopped state is distinct from paused
+  }
   stopCmdListener();
   updateTtsUI('idle');
 }

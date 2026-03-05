@@ -352,3 +352,42 @@ a `.python-version` file is required.
   `.model_dump()` (correct for Pydantic v2); removed stale v1 compatibility comment.
 
 **All 10 tests pass on Python 3.12. Ruff + Black clean.**
+
+## 2026-03-05
+
+### Fix: TTS stop/command-listener root cause bugs
+
+**Problem:** Two root causes produced multiple symptoms:
+
+1. **`ttsStop()` was semantically identical to `ttsPause()`** — it called
+   `.pause()` and reset `currentTime` but left `ttsAudio` non-null and never
+   revoked the blob URL. This caused:
+   - Stop → Play resumed the old clip (treated as paused, not stopped).
+   - `ttsAudio.onpause` fired during stop, briefly showing a "Paused" UI before
+     `updateTtsUI('idle')` corrected it (flicker).
+   - Blob URL was never released → memory leak per session.
+
+2. **The command-listener re-arm gate used `!ttsAudio.ended` — the wrong signal.**
+   `.ended` is `true` only after natural playback completion; `.pause()` never
+   sets it. After "stop", `ttsAudio` was still non-null and `.ended` was `false`,
+   so `startCmdListener()` re-armed itself indefinitely — trapping the user in
+   command-listening mode with no audio playing, and routing all subsequent speech
+   into the TTS command handler instead of the query textarea.
+
+**Fix (1 file — `frontend/app.js`, 3 targeted edits):**
+
+- `ttsStop()`: detach `ttsAudio.onpause` before pausing (kills flicker), call
+  `URL.revokeObjectURL(ttsAudio.src)` (releases blob), set `ttsAudio = null`
+  (makes stopped state unambiguous — identical pattern to `ttsRestart()` and `ttsReset()`).
+
+- Re-arm gate in `recognition.onresult`: changed
+  `(ttsAudio && !ttsAudio.ended) || ttsUsingWebSpeech`
+  → `ttsAudio !== null || ttsUsingWebSpeech`.
+  After `ttsStop()`, `ttsAudio` is `null` → gate is false → listener does not
+  re-arm → mic is silent. After pause, `ttsAudio` is non-null → listener re-arms
+  correctly.
+
+- `ttsPlay()` resume guard: added `!ttsAudio.ended` so a clip that has played to
+  natural completion falls through to re-fetch rather than replaying the stale blob.
+
+**All 10 existing tests pass. No new packages, no backend changes.**
