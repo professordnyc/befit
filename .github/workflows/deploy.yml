@@ -5,23 +5,61 @@ on:
     branches: [main]
 
 jobs:
-  deploy:
+  # ── 1. Run tests first ────────────────────────────────────────────────────
+  test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Trigger Render deployment
-        run: |
-          curl --request POST \
-            --url https://api.render.com/deploy/srv-${{ secrets.RENDER_SERVICE_ID }}?key=${{ secrets.RENDER_API_KEY }} \
-            --header 'Accept: application/json'
-        env:
-          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
 
-      - name: Trigger Netlify deployment
+      - name: Install uv
+        run: pip install uv
+
+      - name: Sync dependencies
+        run: uv sync --all-groups
+
+      - name: Lint with ruff
+        run: uv run ruff check backend/ tests/
+
+      - name: Format check with black
+        run: uv run black --check backend/ tests/
+
+      - name: Run tests
+        run: uv run pytest tests/ -v --cov=backend --cov-report=term-missing
+
+  # ── 2. Deploy only after all test matrix jobs pass ────────────────────────
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Render: trigger via deploy hook URL (set in repo secrets as RENDER_DEPLOY_HOOK_URL)
+      # Get this URL from: Render dashboard → Web Service → Settings → Deploy Hook
+      - name: Trigger Render deployment
+        if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
         run: |
-          curl -X POST -d {} https://api.netlify.com/build_hooks/${{ secrets.NETLIFY_BUILD_HOOK }}
+          curl --silent --show-error --fail --request POST \
+            "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
         env:
-          NETLIFY_BUILD_HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+
+      # Netlify: trigger via build hook URL (set in repo secrets as NETLIFY_BUILD_HOOK_URL)
+      # Get this URL from: Netlify → Site settings → Build & deploy → Build hooks
+      - name: Trigger Netlify deployment
+        if: ${{ secrets.NETLIFY_BUILD_HOOK_URL != '' }}
+        run: |
+          curl --silent --show-error --fail --request POST \
+            "${{ secrets.NETLIFY_BUILD_HOOK_URL }}"
+        env:
+          NETLIFY_BUILD_HOOK_URL: ${{ secrets.NETLIFY_BUILD_HOOK_URL }}
