@@ -431,3 +431,45 @@ function startCmdListener() {
 ```
 
 **All 10 existing tests pass. No new packages, no backend changes.**
+
+## 2026-03-05
+
+### Fix: WebSpeech stop/command-listener race conditions (audio continues after stop; InvalidStateError persists)
+
+**Problem:** Despite the previous two fix rounds, audio continued playing after stop and the
+`InvalidStateError` persisted. Full trace identified five distinct races, all in the WebSpeech
+fallback path (ElevenLabs unavailable = 100% WebSpeech in this environment):
+
+1. **`webSpeechStop()` called `cancel()` with handlers still attached** — Chromium fires both
+   `utt.onerror('interrupted')` and `utt.onend` after `cancel()`. Each called `stopCmdListener()`
+   → `recognition.stop()` → `recognition.onend`. The second `recognition.onend` saw
+   `ttsListening = false` (cleared by the first) and fell through to potentially re-arm query-mic
+   or command-listener via pending timers.
+
+2. **Stale utterance events had no identity guard** — `utt.onend`/`utt.onerror` from a cancelled
+   or replaced utterance could fire against the new session, calling `stopCmdListener()` on it.
+
+3. **`recognition.onend` unconditionally re-armed the command listener when `ttsListening` was true**
+   — even after `stopCmdListener()` had already cleared it, because `stopCmdListener()`'s
+   `recognition.stop()` fired `onend` asynchronously after `ttsListening` was already `false`.
+
+4. **Pending `scheduleRearm` timers had no cancellation on the stop path** — a timer queued before
+   stop fired after stop, restarting the command listener with no audio.
+
+5. **`recognition.onerror` showed a mic error for `'aborted'`** — fired whenever `recognition.stop()`
+   is called programmatically; produced spurious UI errors after every stop.
+
+**Fix (1 file — `frontend/app.js`, 42 lines added / 9 removed):**
+
+- `currentUtt` state variable: holds the active `SpeechSynthesisUtterance`.
+- `rearmTimer` state variable: holds the pending `startCmdListener` timer handle.
+- `cancelRearm()` / `scheduleRearm()` helpers: cancel any pending re-arm before scheduling new one.
+- `webSpeechPlay()`: assigns `currentUtt = utt`; all handlers check `currentUtt === utt` before acting.
+- `webSpeechStop()`: nulls `currentUtt.onend` and `currentUtt.onerror` before `cancel()`, then
+  nulls `currentUtt` — ensures `cancel()` fires no callbacks.
+- `stopCmdListener()`: calls `cancelRearm()` first, killing any pending timer before `recognition.stop()`.
+- `recognition.onend`: re-arms via `scheduleRearm()` (not raw `setTimeout`) only when TTS is still
+  active; blocks `alwaysOn` query-mic restart while TTS is playing.
+- `recognition.onerror`: suppresses both `'no-speech'` and `'aborted'` (programmatic stop).
+
+**All 10 existing tests pass. No new packages, no backend changes.**
