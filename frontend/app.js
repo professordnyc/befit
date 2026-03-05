@@ -22,6 +22,14 @@
 
 'use strict';
 
+// ── API base URL ──────────────────────────────────────────────────────────────
+// When running locally the backend serves this file, so relative URLs work.
+// When deployed to Netlify the backend lives on Render — use the absolute URL.
+const API_BASE = window.location.hostname === 'localhost' ||
+                 window.location.hostname === '127.0.0.1'
+  ? ''
+  : 'https://befit-backend-z9q1.onrender.com';
+
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const cameraContainer  = document.getElementById('camera-container');
 const cameraFeed       = document.getElementById('camera-feed');
@@ -262,7 +270,7 @@ async function runPipeline() {
   };
 
   try {
-    const res = await fetch('/scan-and-plan', {
+    const res = await fetch(API_BASE + '/scan-and-plan', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(body),
@@ -577,7 +585,7 @@ async function ttsPlay() {
   ttsFetching = true;
   updateTtsUI('loading');
   try {
-    const res = await fetch('/tts', {
+    const res = await fetch(API_BASE + '/tts', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ text: ttsText }),
