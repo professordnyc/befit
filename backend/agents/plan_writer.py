@@ -81,9 +81,8 @@ async def run(
     """
     logger.info("PlanWriter: drafting today's plan")
 
-    # Pydantic v1 uses .dict(); v2 uses .model_dump() — keep v1 compatible
-    items_payload = [i.dict() for i in items]
-    flags_payload = [f.dict() for f in risk_flags]
+    items_payload = [i.model_dump() for i in items]
+    flags_payload = [f.model_dump() for f in risk_flags]
 
     user_message = json.dumps(
         {
