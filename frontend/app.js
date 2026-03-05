@@ -100,6 +100,9 @@ let ttsAudio    = null;
 let ttsText     = '';
 let ttsFetching = false;
 let ttsUsingWebSpeech = false;   // true when WebSpeech fallback is active
+/** @type {SpeechSynthesisUtterance|null} */
+let currentUtt  = null;          // active WebSpeech utterance; nulled before cancel
+let rearmTimer  = null;          // pending startCmdListener setTimeout handle
 
 // ── Camera ────────────────────────────────────────────────────────────────────
 function stopStream() {
@@ -470,13 +473,23 @@ function initSpeech() {
   recognition.onend   = () => {
     isListening = false;
     updateMicUI();
-    if (ttsListening) { ttsListening = false; setTimeout(startCmdListener, 200); return; }
-    if (alwaysOn) setTimeout(() => { if (alwaysOn) startListening(); }, 300);
+    // If cmd-listener timed out (no speech), re-arm only while TTS is still active.
+    // Do NOT re-arm if stopCmdListener() already cleared ttsListening.
+    if (ttsListening) {
+      ttsListening = false;
+      if (ttsAudio !== null || ttsUsingWebSpeech) scheduleRearm();
+      return;
+    }
+    // Query mic: restart only when always-on AND TTS is not active.
+    if (alwaysOn && !ttsUsingWebSpeech && ttsAudio === null) {
+      setTimeout(() => { if (alwaysOn) startListening(); }, 300);
+    }
   };
   recognition.onerror = (event) => {
     isListening = false;
     updateMicUI();
-    if (event.error !== 'no-speech') showMicError(event.error || 'Microphone error. Please try again.');
+    const silent = ['no-speech', 'aborted'];
+    if (!silent.includes(event.error)) showMicError(event.error || 'Microphone error. Please try again.');
   };
   recognition.onresult = (event) => {
     const last = event.results[event.results.length - 1];
@@ -488,7 +501,7 @@ function initSpeech() {
       else if (cmd === 'pause')                       ttsPause();
       else if (cmd === 'stop')                        ttsStop();
       ttsListening = false;
-      if (ttsAudio !== null || ttsUsingWebSpeech) setTimeout(startCmdListener, 200);
+      if (ttsAudio !== null || ttsUsingWebSpeech) scheduleRearm();
       return;
     }
     finalTranscript = interimTranscript = '';
@@ -510,15 +523,24 @@ function initSpeech() {
 // ttsListening=true routes recognition.onresult to TTS commands, not query textarea.
 let ttsListening = false;
 
+function cancelRearm() {
+  if (rearmTimer !== null) { clearTimeout(rearmTimer); rearmTimer = null; }
+}
+function scheduleRearm() {
+  cancelRearm();
+  rearmTimer = setTimeout(() => { rearmTimer = null; startCmdListener(); }, 300);
+}
+
 function startCmdListener() {
   if (!recognition || ttsListening) return;
   ttsListening = true;
   if (isListening) return;   // already running — flag flip is enough; don't restart
-  stopListening();
+  stopListening();            // stop query-mic; onend will fire but ttsListening guards it
   try { recognition.start(); } catch (_) { /* ignore */ }
 }
 
 function stopCmdListener() {
+  cancelRearm();              // cancel any pending re-arm before tearing down
   ttsListening = false;
   stopListening();
 }
@@ -554,11 +576,12 @@ function webSpeechPlay(text) {
   window.speechSynthesis.cancel();
   ttsUsingWebSpeech = true;
   const utt = new SpeechSynthesisUtterance(text);
+  currentUtt = utt;
   utt.lang = 'en-US';
   utt.rate = 0.95;
-  utt.onstart  = () => { updateTtsUI('playing'); startCmdListener(); };
-  utt.onend    = () => { ttsUsingWebSpeech = false; updateTtsUI('idle');   stopCmdListener(); };
-  utt.onerror  = () => { ttsUsingWebSpeech = false; updateTtsUI('idle');   stopCmdListener(); };
+  utt.onstart  = () => { if (currentUtt !== utt) return; updateTtsUI('playing'); startCmdListener(); };
+  utt.onend    = () => { if (currentUtt !== utt) return; currentUtt = null; ttsUsingWebSpeech = false; updateTtsUI('idle'); stopCmdListener(); };
+  utt.onerror  = () => { if (currentUtt !== utt) return; currentUtt = null; ttsUsingWebSpeech = false; updateTtsUI('idle'); stopCmdListener(); };
   utt.onpause  = () => { updateTtsUI('paused'); };
   utt.onresume = () => { updateTtsUI('playing'); };
   window.speechSynthesis.speak(utt);
@@ -567,7 +590,17 @@ function webSpeechPlay(text) {
 
 function webSpeechPause()   { if (window.speechSynthesis?.speaking) window.speechSynthesis.pause(); }
 function webSpeechResume()  { if (window.speechSynthesis?.paused)   window.speechSynthesis.resume(); }
-function webSpeechStop()    { ttsUsingWebSpeech = false; window.speechSynthesis?.cancel(); stopCmdListener(); updateTtsUI('idle'); }
+function webSpeechStop() {
+  if (currentUtt) {
+    currentUtt.onend = null;    // detach before cancel() to prevent double stopCmdListener
+    currentUtt.onerror = null;
+    currentUtt = null;
+  }
+  ttsUsingWebSpeech = false;
+  window.speechSynthesis?.cancel();
+  stopCmdListener();
+  updateTtsUI('idle');
+}
 
 // ── TTS – core ────────────────────────────────────────────────────────────────
 async function ttsPlay() {
