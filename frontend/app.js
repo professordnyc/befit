@@ -513,6 +513,7 @@ let ttsListening = false;
 function startCmdListener() {
   if (!recognition || ttsListening) return;
   ttsListening = true;
+  if (isListening) return;   // already running — flag flip is enough; don't restart
   stopListening();
   try { recognition.start(); } catch (_) { /* ignore */ }
 }

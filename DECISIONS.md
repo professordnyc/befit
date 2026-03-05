@@ -391,3 +391,43 @@ a `.python-version` file is required.
   natural completion falls through to re-fetch rather than replaying the stale blob.
 
 **All 10 existing tests pass. No new packages, no backend changes.**
+
+## 2026-03-05
+
+### Fix: InvalidStateError — SpeechRecognition double-start on WebSpeech TTS fallback
+
+**Problem:** When ElevenLabs is unavailable (502) and the WebSpeech fallback fires,
+`utt.onstart` calls `startCmdListener()`. Inside `startCmdListener()`, `stopListening()`
+calls `recognition.stop()`, which dispatches `recognition.onend` asynchronously.
+By the time `onend` runs, `recognition.start()` inside `startCmdListener()` has already
+been called and the session is active. `onend` sees `ttsListening = true`, resets it to
+`false`, and schedules a second `startCmdListener()` via `setTimeout(200)`. That second
+call hits `recognition.start()` while recognition is already running →
+
+```
+InvalidStateError: Failed to execute 'start' on 'SpeechRecognition':
+recognition has already started.
+```
+
+This error surfaced specifically with the WebSpeech fallback path because ElevenLabs'
+`HTMLAudioElement.onplay` fires synchronously before `recognition.onend` can race,
+masking the issue on the primary path.
+
+**Fix (1 line — `frontend/app.js`):**
+
+Added `if (isListening) return;` immediately after `ttsListening = true` in
+`startCmdListener()`. If recognition is already active, flipping `ttsListening` to
+`true` is sufficient — the running session's `onresult` will route to the command
+handler automatically. No stop/restart needed.
+
+```js
+function startCmdListener() {
+  if (!recognition || ttsListening) return;
+  ttsListening = true;
+  if (isListening) return;   // already running — flag flip is enough; don't restart
+  stopListening();
+  try { recognition.start(); } catch (_) { /* ignore */ }
+}
+```
+
+**All 10 existing tests pass. No new packages, no backend changes.**
