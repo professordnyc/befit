@@ -2,9 +2,9 @@ services:
   - type: web
     name: befit-backend
     runtime: python
-    startCommand: "uv run uvicorn backend.main:app"
+    startCommand: "uv run uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
     plan: free
-    preDeployCommand: "uv sync"
+    preDeployCommand: "uv sync --all-groups"
     envVars:
       - key: PYTHON_VERSION
         value: "3.12"

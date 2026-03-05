@@ -76,8 +76,8 @@ async def run(
         {
             "user_question": intent.get("user_question", ""),
             "draft": draft,
-            "detected_items": [i.model_dump() for i in items],
-            "risk_flags": [f.model_dump() for f in risk_flags],
+            "detected_items": [i.dict() for i in items],
+            "risk_flags": [f.dict() for f in risk_flags],
         },
         indent=2,
     )

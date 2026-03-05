@@ -89,7 +89,7 @@
 
 5. **Deploy and note your URL:**
    - Wait 2–3 minutes
-   - Copy backend URL: `https://befit-backend.onrender.com`
+   - Copy backend URL: `https://befit-backend-z9q1.onrender.com`
 
 ### Phase 3: Set Up Netlify Frontend (10 minutes)
 
@@ -106,7 +106,7 @@
 
 4. **Environment (optional):**
    ```
-   PUBLIC_API_BASE_URL=https://befit-backend.onrender.com
+   PUBLIC_API_BASE_URL=https://befit-backend-z9q1.onrender.com
    ```
 
 5. **Deploy and note your URL:**
@@ -190,7 +190,9 @@ A: Both Render & Netlify keep deployment history. Click previous version to re-d
 
 | Issue | Solution |
 |---|---|
-| **Render build fails** | Check logs: Render → Web Service → Logs. Ensure `uv sync` works locally. |
+| **Render build fails** | Check logs: Render → Web Service → Logs. Ensure `uv sync --all-groups` works locally. |
+| **Render health check times out / 503** | Confirm `startCommand` in `render.yaml` includes `--host 0.0.0.0 --port $PORT`. Without these flags uvicorn binds to `127.0.0.1:8000`, unreachable by Render's load balancer. |
+| **Tests fail — `'DetectedItem' has no attribute 'model_dump'`** | Project pins Pydantic v1; use `.dict()` not `.model_dump()`. Fixed in `plan_writer.py` and `reflector.py`. |
 | **Frontend shows blank** | Check Netlify build: Netlify → Deploys. Ensure `frontend/` folder exists. |
 | **CORS error** | Add Netlify URL to `ALLOWED_ORIGINS` env var in Render backend. |
 | **Tests fail on GitHub** | Run locally: `uv run pytest tests/ -v` to debug. |

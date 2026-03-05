@@ -272,3 +272,53 @@ not configured). The browser detects this and silently switches to WebSpeech.
   - Default behaviour (503 → browser WebSpeech, no config required).
   - `FORCE_WEBSPEECH_TTS=false` placeholder for a future opt-in server flag.
 
+
+## 2026-03-05
+
+### Fix: Pydantic v1 compatibility — `.model_dump()` → `.dict()`
+
+**Problem:** Three tests in `tests/test_question_answering.py` failed with:
+```
+AttributeError: 'DetectedItem' object has no attribute 'model_dump'
+```
+The project pins **Pydantic 1.10.15** (see `pyproject.toml`).
+`.model_dump()` is a Pydantic **v2** API; Pydantic v1 exposes `.dict()`.
+`plan_writer.py` and `reflector.py` were calling the v2 method, causing
+`AttributeError` at runtime and in tests whenever a `DetectedItem` or
+`RiskFlag` was serialised.
+
+**Fix (2 files):**
+
+- `backend/agents/plan_writer.py` – `items_payload` and `flags_payload`
+  list-comprehensions changed from `.model_dump()` to `.dict()`.
+- `backend/agents/reflector.py` – `detected_items` and `risk_flags`
+  list-comprehensions in the payload dict changed from `.model_dump()` to `.dict()`.
+
+**Result:** All 10 tests pass (`3 fixed + 7 previously passing`).
+Ruff and Black checks remain clean.
+
+### Fix: Render deployment — missing `--host` / `--port` in `render.yaml`
+
+**Problem:** `render.yaml` `startCommand` was:
+```
+uv run uvicorn backend.main:app
+```
+Render requires the server to bind to `0.0.0.0` and the dynamic `$PORT`
+environment variable it injects. Without these flags uvicorn defaults to
+`127.0.0.1:8000`, which is unreachable from Render's load balancer, causing
+the health check to time out and the deployment to fail.
+
+The correct command was already documented in both `Procfile` and `DEPLOYMENT.md`
+but had never been applied to `render.yaml`.
+
+Additionally `preDeployCommand` was `uv sync` (runtime deps only); changed to
+`uv sync --all-groups` so dev/test dependencies (pytest, ruff, black) are
+available during Render's build step if CI is run there.
+
+**Fix (1 file):**
+
+- `render.yaml` – `startCommand` updated to:
+  `uv run uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+  `preDeployCommand` updated to: `uv sync --all-groups`
+
+**No new packages, no schema changes, no frontend changes.**
