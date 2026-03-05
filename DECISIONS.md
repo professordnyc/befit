@@ -322,3 +322,33 @@ available during Render's build step if CI is run there.
   `preDeployCommand` updated to: `uv sync --all-groups`
 
 **No new packages, no schema changes, no frontend changes.**
+
+## 2026-03-05
+
+### Fix: Pin Python 3.12 + upgrade to Pydantic v2 + modern dependency set
+
+**Problem:** Render defaults to Python 3.14. All pinned packages — Pydantic 1.10.15,
+FastAPI 0.104.1, uvicorn 0.24.0, openai 1.3.7, httpx 0.25.2 — have no Python 3.14
+wheels and their C extensions do not compile on 3.14. Render's `PYTHON_VERSION`
+env var in `render.yaml` is not respected by the `runtime: python` build system;
+a `.python-version` file is required.
+
+**Root error:** `pydantic.errors.ConfigError: unable to infer type for attribute "name"`
+(Pydantic 1.10.15 C extension failing on Python 3.14 at import time.)
+
+**Fix (5 files):**
+
+- `.python-version` *(new)* — pins `3.12`; read by both `uv` and Render's build
+  system before the venv is created. This is the canonical way to select the Python
+  runtime when using `uv` on Render.
+- `pyproject.toml` — upgraded all deps to Python 3.12-compatible versions with Pydantic v2:
+  `pydantic 1.10.15 → 2.11.1`, `fastapi 0.104.1 → 0.115.12`, `uvicorn 0.24.0 → 0.34.0`,
+  `openai 1.3.7 → 1.70.0`, `httpx 0.25.2 → 0.28.1`, `python-dotenv 1.0.0 → 1.1.0`,
+  `pytest 7.4.3 → 8.3.5`, `pytest-asyncio 0.21.1 → 0.25.3`, `pytest-cov 4.1.0 → 6.1.0`,
+  `black 23.12.0 → 25.1.0`, `ruff 0.7.0 → 0.11.2`. Added `asyncio_mode = "auto"`.
+  Tightened `requires-python` to `>=3.10,<3.15`.
+- `uv.lock` — regenerated for Python 3.12 + new dep set.
+- `backend/agents/plan_writer.py`, `backend/agents/reflector.py` — restored
+  `.model_dump()` (correct for Pydantic v2); removed stale v1 compatibility comment.
+
+**All 10 tests pass on Python 3.12. Ruff + Black clean.**
