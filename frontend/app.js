@@ -549,13 +549,13 @@ function scheduleRearm() {
 function startCmdListener() {
   if (!recognition || ttsListening) return;
   ttsListening = true;
-  // Always stop any running session explicitly so onend fires a clean restart.
-  // On Android Chrome, leaving a query-mode session running and relying on the
-  // ttsListening flag alone is unreliable: the continuous:false session ends on
-  // its silence timeout before the user speaks, and the mode-switch is racy.
-  // An explicit stop triggers onend where ttsListening=true guards the branch
-  // and scheduleRearm() starts a clean command-mode session.
-  stopListening();            // stop query-mic; onend fires, ttsListening guards it
+  // Only stop if a session is actually running. Calling recognition.stop() on an
+  // already-idle instance fires a spurious onend synchronously on Android Chrome.
+  // That onend sees ttsListening===true and immediately resets it to false,
+  // destroying the command-mode flag before recognition.start() can establish
+  // the session. Guarding with isListening ensures stop() is only called when
+  // there is a live query session to hand off cleanly.
+  if (isListening) stopListening(); // stop live query-mic; onend guards the rearm
   try {
     recognition.start();
   } catch (e) {

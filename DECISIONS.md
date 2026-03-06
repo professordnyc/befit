@@ -682,3 +682,64 @@ already consumed ambient speech in query mode. An explicit `stopListening()` for
 - `startCmdListener()`: remove early-return; always call `stopListening()` explicitly
 
 **No backend changes. No new packages. Desktop Chrome behaviour unchanged.**
+
+## 2026-03-06 (v5 — voice command root-cause fix)
+
+### Fix: Voice commands (pause, play, stop) unresponsive on all Android Chrome versions
+
+All previous fixes addressed symptoms of a deeper structural defect in the
+`startCmdListener()` / `recognition.onend` interaction. The definitive root cause was
+identified through full execution-path tracing.
+
+**Root cause — spurious `onend` from `recognition.stop()` on an idle instance**
+
+`startCmdListener()` unconditionally called `stopListening()` (which calls
+`recognition.stop()`) before calling `recognition.start()`. The intent was to cleanly
+hand off from query mode to command mode by stopping any running query session.
+
+On Android Chrome, calling `recognition.stop()` on an **already-idle** instance
+(one that ended naturally via silence timeout ~5–8 s earlier) fires `recognition.onend`
+**synchronously**. Because `ttsListening` had just been set to `true` at the top of
+`startCmdListener()`, the `onend` handler's `ttsListening` branch executed:
+
+```
+onend fires synchronously ← triggered by stop() on idle instance
+  ttsListening = false;   ← destroys the flag just set by startCmdListener()
+  scheduleRearm();        ← queues another 1200ms retry (which hits same bug)
+```
+
+`recognition.start()` then ran (or had already run) with `ttsListening === false`.
+Every `onresult` event was routed to the query textarea branch. Spoken commands were
+silently swallowed as query text.
+
+**Why desktop Chrome was unaffected:**
+Desktop Chrome's silence timeout is ~20 s, so the query session was still live when
+`startCmdListener()` ran. `stop()` hit a live session; `onend` fired asynchronously
+after `recognition.start()` had already committed. The race was consistently won by
+`start()` on desktop — a coincidence of timing, not a design guarantee.
+
+**Why previous fixes didn't reach this:**
+The v4 fix removed the unconditional `stopListening()` early-return guard but replaced
+it with an unconditional `stopListening()` call — trading one bug for another. The
+pre-unlock (v3), `.load()` (v3), `ttsReset` singleton (v4), and `ttsFetching` gate (v4)
+were all necessary and remain correct, but none of them could prevent the spurious
+`onend` because none of them changed whether `recognition.stop()` was called on an
+idle instance.
+
+**Fix (1 line changed — `frontend/app.js` line 558):**
+
+```js
+// Before (v4):
+stopListening();            // stop query-mic; onend fires, ttsListening guards it
+
+// After (v5):
+if (isListening) stopListening(); // stop live query-mic; onend guards the rearm
+```
+
+The guard ensures `recognition.stop()` is only called when there is a genuinely live
+session to hand off. When `isListening === false` (the Android case: session already
+ended by silence timeout), the stop is skipped entirely — no spurious `onend`, no flag
+destruction, and `recognition.start()` establishes the command session cleanly with
+`ttsListening === true` intact.
+
+**No backend changes. No new packages. Desktop Chrome behaviour unchanged.**

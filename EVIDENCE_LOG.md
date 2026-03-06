@@ -48,3 +48,14 @@ This file captures sample runs, logs, and evidence that the system works as inte
 - **Expected behaviour post-fix:** voice commands (play, pause, stop, listen) trigger
   correctly after plan generation with always-on enabled, on all Android Chrome versions.
 - **Desktop Chrome:** No regression. Always-on query mic continues to function normally.
+
+## 2026-03-06 (v5) — Voice command root-cause fix
+
+- **Root cause confirmed:** `recognition.stop()` called unconditionally on an already-idle
+  instance in `startCmdListener()`. Android Chrome fires `onend` synchronously, resetting
+  `ttsListening=false` before the command session is established. All spoken commands
+  were routed to the query textarea. Desktop unaffected due to longer silence timeout.
+- **Fix:** Single `if (isListening)` guard added to `stopListening()` call in
+  `startCmdListener()`. Spurious `onend` eliminated. Command session established cleanly.
+- **Expected:** Voice commands (pause, play, stop, listen) now fire correctly on Android
+  Chrome regardless of version, with or without always-on enabled.
