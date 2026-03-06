@@ -609,9 +609,20 @@ async function ttsPlay() {
   // Resume WebSpeech if paused
   if (ttsUsingWebSpeech) { webSpeechResume(); return; }
 
-  // Resume HTMLAudio if paused
-  if (ttsAudio && ttsAudio.paused && !ttsAudio.ended && ttsAudio.currentSrc) {
-    ttsAudio.play(); updateTtsUI('playing'); startCmdListener(); return;
+  // Resume HTMLAudio if paused.
+  // Use .src not .currentSrc: on Android Chrome .currentSrc stays "" until
+  // HAVE_METADATA readyState, silently breaking the guard (Android 16 bug).
+  // Await play() so a policy rejection surfaces to the catch block (Android 12 bug).
+  if (ttsAudio && ttsAudio.paused && !ttsAudio.ended && ttsAudio.src) {
+    try {
+      await ttsAudio.play();
+      updateTtsUI('playing'); startCmdListener();
+    } catch (err) {
+      updateTtsUI('idle'); stopCmdListener();
+      ttsStatus.textContent = '⚠️ Audio unavailable';
+      console.warn('TTS resume error:', err.message);
+    }
+    return;
   }
   if (ttsAudio && !ttsAudio.paused) return;
   if (!ttsText) return;
@@ -644,9 +655,11 @@ async function ttsPlay() {
     ttsAudio = new Audio(url);
     ttsAudio.onplay  = () => { updateTtsUI('playing'); startCmdListener(); };
     ttsAudio.onpause = () => { updateTtsUI('paused'); };
-    ttsAudio.onended = () => { updateTtsUI('idle');   stopCmdListener(); };
-    ttsAudio.onerror = () => { updateTtsUI('idle');   stopCmdListener(); };
-    ttsAudio.play();
+    ttsAudio.onended = () => { updateTtsUI('idle'); stopCmdListener(); };
+    ttsAudio.onerror = () => { updateTtsUI('idle'); stopCmdListener(); };
+    // Await play() so Android autoplay-policy rejections (NotAllowedError after
+    // multiple async awaits exhaust the user-gesture activation token) are caught below.
+    await ttsAudio.play();
   } catch (err) {
     updateTtsUI('idle');
     stopCmdListener();
