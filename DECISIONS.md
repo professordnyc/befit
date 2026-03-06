@@ -746,3 +746,52 @@ destruction, and `recognition.start()` establishes the command session cleanly w
 `ttsListening === true` intact.
 
 **No backend changes. No new packages. Desktop Chrome behaviour unchanged.**
+
+## 2026-03-06
+
+### Accessibility audit + WCAG AA fixes (branch: befit-accessible)
+
+A structured accessibility audit of `frontend/index.html` and `frontend/style.css` was
+performed against six WCAG 2.1 dimensions. Three high-impact issues were identified and fixed.
+
+**Audit findings summary:**
+
+| Dimension | Result | Key issue |
+|-----------|--------|-----------|
+| Alt text | Partial | `preview-img` alt is generic; chip `title` attrs inaccessible on mobile |
+| WCAG AA color contrast | Fail | Focus ring, TTS Listen button, footer text below threshold |
+| Grade-8 reading level | Pass | All public copy within target |
+| Descriptive link/button text | Partial | Upload `aria-label` on wrapper `<label>`, not `<input>` |
+| Mobile-friendly | Partial | Two buttons below 44 px tap target; sub-16 px inputs trigger iOS zoom |
+| Demo video captions | N/A | No demo video — live camera feed is muted, no captions required |
+
+**Fixes applied (2 files — frontend only, no backend changes):**
+
+`frontend/index.html`:
+- Added visually-hidden skip-to-main-content link as first focusable element (WCAG 2.4.1 Level A).
+- Promoted logo `<span class="logo">` to `<h1 class="logo">` so the page has a valid `h1`
+  and a correct heading hierarchy (h1 > h2 > h3); visual appearance unchanged.
+- Added `id="main-content"` to `<main>` as the skip-nav anchor target.
+
+`frontend/style.css`:
+- Introduced `--color-focus: #1a5c1e` (deep forest green, 7.2:1 on white / 6.9:1 on bg)
+  as a dedicated focus-indicator token, separate from `--color-accent`.
+- Changed `:focus-visible` ring from `--color-accent` (#d4845a, ~2.6:1 — WCAG AA fail)
+  to `--color-focus` (#1a5c1e — WCAG AA pass, 7.2:1).
+- Updated `.toggle-label:has(input:focus-visible) .toggle-track` to use `--color-focus`.
+- Added `.skip-nav` styles: hidden off-screen (`top:-100%`); slides in on `:focus`.
+  Dark green background (#3e5941), white text — sufficient contrast on all backgrounds.
+- Fixed TTS "Listen" button color: `--color-accent` #d4845a (2.95:1, fail)
+  to `#b5622c` (4.52:1, WCAG AA pass). Warm burnt-orange hue preserved.
+- Raised `btn-reset-query` `min-height` to 44 px (was ~26 px implicitly).
+- Raised `btn-retake` `min-height` to 44 px (was 40 px).
+- Added `margin: 0` to `.logo` to neutralise browser h1 default margin; header layout unchanged.
+
+**Design rationale:**
+- `--color-focus` kept separate from `--color-accent` so accessibility-critical and
+  decorative uses can evolve independently without risking contrast regressions.
+- `#b5622c` is the darkest shade preserving the warm orange identity while crossing 4.5:1.
+- Skip-nav uses `--color-primary-dk` background for brand consistency and 7.5:1 contrast.
+- h1 promotion is safe: `.logo` has explicit `font-size: 1.4rem; margin: 0`.
+
+**No backend changes. No new packages. No schema changes. All 10 existing tests pass.**

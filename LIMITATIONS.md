@@ -35,3 +35,26 @@ This document describes what Befit does **not** do and important safety constrai
 - Frame capture quality depends on device camera and ambient lighting; poor lighting may reduce item detection accuracy.
 - Camera stream is stopped immediately after frame capture to conserve device resources.
 - Auto-capture mode takes a frame automatically after a 3-second countdown. It is opt-in (toggle off by default). Manual capture remains available at any time via the toggle.
+## Accessibility limitations
+
+- The skip navigation link is the first focusable element; keyboard users should press Tab once on page load to reveal it.
+- Chip items in the "Items we noticed" list display additional notes (e.g. "high-sodium label visible") as `title` tooltip attributes only. These are not announced by screen readers on mobile or touch devices; users relying on assistive technology on mobile should treat chip labels as the primary information.
+- The camera hint countdown ("Auto-capture in 3s…") updates a `<span>` that is not inside an `aria-live` region; screen reader users will not hear countdown updates. The auto-capture toggle can be turned off at any time to revert to manual capture.
+- Context form fields (`<select>`, `<input>`) use `font-size: 0.9rem` (14.4 px), which may trigger iOS Safari auto-zoom on focus. Users who find this disruptive can disable auto-zoom in iOS accessibility settings.
+- The page has one `<h1>` (the Befit logo/app name in the header), followed by `<h2>` section headings and `<h3>` card sub-headings. This hierarchy is correct and navigable by screen reader heading commands.
+## Accessibility limitations
+
+- The skip navigation link is the first focusable element on the page. Keyboard users should
+  press Tab once on page load to reveal it, then Enter to jump past the header to main content.
+- Chip items in the "Items we noticed" list display extra notes (e.g. "high-sodium label visible")
+  as `title` tooltip attributes only. These are not announced by screen readers on mobile or
+  touch devices; chip labels carry the primary information.
+- The auto-capture countdown ("Auto-capture in 3s…") updates a `<span>` that is not in an
+  `aria-live` region; screen reader users will not hear countdown updates. The Auto-capture
+  toggle can be turned off at any time to use manual capture instead.
+- Context form fields (`<select>`, text `<input>`) use `font-size: 0.9rem` (14.4 px), which
+  may trigger iOS Safari auto-zoom on focus. Users who find this disruptive can disable auto-zoom
+  in iOS accessibility settings or increase the browser's minimum font size.
+- The page heading hierarchy is: one `<h1>` (app name in header) > `<h2>` section headings >
+  `<h3>` card sub-headings. This hierarchy is intentional and navigable by screen reader heading
+  commands (e.g. H / Shift+H in NVDA/JAWS, swipe by heading in VoiceOver).
