@@ -291,7 +291,13 @@ async function runPipeline() {
     todayCardEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     ttsText = buildTtsScript(card);
-    ttsPlay();
+    // Pre-unlock an Audio element synchronously to capture the user-gesture
+    // activation token on Android 12 Chrome, which invalidates it after
+    // network I/O async awaits. ttsPlay() reuses this element for real audio.
+    const _unlock = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+    _unlock.play().catch(() => {});
+    _unlock.pause();
+    ttsPlay(_unlock);
   } catch (err) {
     showError(err.message || 'Something went wrong. Please try again.');
   } finally {
@@ -528,7 +534,8 @@ function cancelRearm() {
 }
 function scheduleRearm() {
   cancelRearm();
-  rearmTimer = setTimeout(() => { rearmTimer = null; startCmdListener(); }, 300);
+  // 700 ms lets Android Chrome recognition service fully reset before next start().
+  rearmTimer = setTimeout(() => { rearmTimer = null; startCmdListener(); }, 700);
 }
 
 function startCmdListener() {
@@ -536,7 +543,14 @@ function startCmdListener() {
   ttsListening = true;
   if (isListening) return;   // already running — flag flip is enough; don't restart
   stopListening();            // stop query-mic; onend will fire but ttsListening guards it
-  try { recognition.start(); } catch (_) { /* ignore */ }
+  try {
+    recognition.start();
+  } catch (e) {
+    // InvalidStateError: recognition still cooling down on Android Chrome.
+    // Roll back ttsListening so it never stays true with recognition dead.
+    ttsListening = false;
+    scheduleRearm();
+  }
 }
 
 function stopCmdListener() {
@@ -603,7 +617,7 @@ function webSpeechStop() {
 }
 
 // ── TTS – core ────────────────────────────────────────────────────────────────
-async function ttsPlay() {
+async function ttsPlay(preUnlockedAudio) {
   if (ttsFetching) return;
 
   // Resume WebSpeech if paused
@@ -652,7 +666,13 @@ async function ttsPlay() {
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);
     if (ttsAudio) { ttsAudio.pause(); URL.revokeObjectURL(ttsAudio.src); }
-    ttsAudio = new Audio(url);
+    // Reuse pre-unlocked Audio element when available (Android 12 autoplay fix).
+    if (preUnlockedAudio) {
+      ttsAudio = preUnlockedAudio;
+      ttsAudio.src = url;
+    } else {
+      ttsAudio = new Audio(url);
+    }
     ttsAudio.onplay  = () => { updateTtsUI('playing'); startCmdListener(); };
     ttsAudio.onpause = () => { updateTtsUI('paused'); };
     ttsAudio.onended = () => { updateTtsUI('idle'); stopCmdListener(); };
