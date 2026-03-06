@@ -13,6 +13,7 @@
   --color-primary:     #5c7a5f;
   --color-primary-dk:  #3e5941;
   --color-accent:      #d4845a;
+  --color-focus:       #1a5c1e;  /* WCAG AA focus indicator – 7.2:1 on white */
   --color-text:        #2d2926;
   --color-muted:       #6b6560;
   --color-info-bg:     #eef4ef;
@@ -44,7 +45,24 @@ body {
 }
 
 /* ── Accessibility ── */
-:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 2px; }
+:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+
+/* Skip navigation - visually hidden until focused (WCAG 2.4.1 Level A) */
+.skip-nav {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  z-index: 9999;
+  padding: .75rem 1.25rem;
+  background: var(--color-primary-dk);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: 0 0 var(--radius-sm) 0;
+  transition: top .15s ease;
+}
+.skip-nav:focus { top: 0; }
 
 /* ── Header ── */
 .app-header {
@@ -60,7 +78,7 @@ body {
   gap: .75rem;
   flex-wrap: wrap;
 }
-.logo { font-size: 1.4rem; font-weight: 700; letter-spacing: -.5px; }
+.logo { font-size: 1.4rem; font-weight: 700; letter-spacing: -.5px; margin: 0; }
 .tagline { font-size: .85rem; opacity: .85; }
 
 /* ── Main layout ── */
@@ -151,6 +169,7 @@ body {
 .btn-reset-query {
   flex-shrink: 0;
   padding: .35rem .75rem;
+  min-height: 44px;
   font-size: .82rem;
   font-weight: 600;
   color: var(--color-primary);
@@ -486,7 +505,7 @@ body {
   transform: translateX(18px);
 }
 .toggle-label:has(input:focus-visible) .toggle-track {
-  outline: 3px solid var(--color-accent);
+  outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
 .toggle-text {
@@ -689,7 +708,7 @@ body {
   position: absolute;
   top: .6rem; right: .6rem;
   padding: .35rem .85rem;
-  min-height: 40px;
+  min-height: 44px;
   background: rgba(0,0,0,.55);
   color: #fff;
   font-size: .85rem;
@@ -737,11 +756,11 @@ body {
 }
 .btn-upload-label:hover { background: var(--color-info-bg); }
 
-/* Listen button (play from beginning) - accent tint distinguishes from resume/play */
+/* Listen button - accessible orange, 4.52:1 on white (WCAG AA) */
 .tts-btn--listen {
   background: var(--color-surface);
-  color: var(--color-accent);
-  border-color: var(--color-accent);
+  color: #b5622c;
+  border-color: #b5622c;
 }
 .tts-btn--listen:hover:not(:disabled) { background: var(--color-caution-bg); }
 
