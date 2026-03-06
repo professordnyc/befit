@@ -27,7 +27,7 @@
     X-Content-Type-Options = "nosniff"
     X-XSS-Protection = "1; mode=block"
     # Update Access-Control-Allow-Origin to match your Render backend
-    # Access-Control-Allow-Origin = "https://your-befit-backend.onrender.com"
+    # Access-Control-Allow-Origin = "https://befit-backend-z9q1.onrender.com"
 
 # Cache static assets (CSS, JS, images)
 [[headers]]

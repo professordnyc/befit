@@ -111,7 +111,7 @@
 
 5. **Deploy and note your URL:**
    - Auto-deploys
-   - Frontend URL: `https://befit.netlify.app`
+   - Frontend URL: `https://getbefit.netlify.app`
 
 ### Phase 4: GitHub Actions + Secrets (10 minutes)
 
@@ -135,12 +135,12 @@
 
 1. **Health check:**
    ```bash
-   curl https://befit-backend.onrender.com/health
+   curl https://befit-backend-z9q1.onrender.com/health
    # Should return: {"status": "ok"}
    ```
 
 2. **Open frontend:**
-   - Visit https://befit.netlify.app
+   - Visit https://getbefit.netlify.app
    - Camera should load
    - Try a scan
 

@@ -46,13 +46,13 @@ BEFIT_ENV=production
 OPENAI_API_KEY=your-openrouter-key-here
 ELEVENLABS_API_KEY=your-elevenlabs-key-here
 OPENAI_BASE_URL=https://openrouter.ai/api/v1
-ALLOWED_ORIGINS=https://befit.netlify.app,https://your-custom-domain.com
+ALLOWED_ORIGINS=https://getbefit.netlify.app,https://your-custom-domain.com
 ```
 
 ### 2d. Deploy
 Click **"Deploy"** and wait ~2–3 minutes. Your backend URL will be:
 ```
-https://befit-backend.onrender.com
+https://befit-backend-z9q1.onrender.com/
 ```
 
 ---
@@ -74,14 +74,14 @@ https://befit-backend.onrender.com
 Go to **Site settings** → **Build & deploy** → **Environment**
 
 ```env
-PUBLIC_API_BASE_URL=https://befit-backend.onrender.com
-PUBLIC_APP_BASE_URL=https://befit.netlify.app
+PUBLIC_API_BASE_URL=[https://befit-backend-z9q1.onrender.com](https://befit-backend-z9q1.onrender.com/)
+PUBLIC_APP_BASE_URL=https://getbefit.netlify.app 
 ```
 
 ### 3d. Deploy
 Netlify auto-deploys on push to `main`. Your frontend URL will be:
 ```
-https://befit.netlify.app
+https://getbefit.netlify.app
 ```
 
 Or use a custom domain:
@@ -122,7 +122,7 @@ The following GitHub Actions run automatically:
 
 ### Backend Health Check
 ```bash
-curl https://befit-backend.onrender.com/health
+curl https://befit-backend-z9q1.onrender.com/health
 ```
 
 Expected response:
@@ -134,7 +134,7 @@ Expected response:
 See [backend/README.md](backend/README.md) for API docs.
 
 ### Frontend
-Open **https://befit.netlify.app** in your browser.
+Open **https://getbefit.netlify.app** in your browser.
 
 ---
 
