@@ -525,3 +525,106 @@ Two compounding causes in the command-listener rearm cycle:
   resume guard and cmd-listener rearm.
 
 **No backend changes. No new packages. Desktop Chrome behaviour unchanged.**
+
+## 2026-03-06 (v3 — follow-up to v2 Android TTS fixes)
+
+### Fix: Android 12 audio still blocked; Android 16 voice commands still dying
+
+Post-deployment testing and analysis of a Perplexity troubleshooting session
+([see downloaded MD file in project context]) revealed three remaining gaps in the
+v2 fixes.
+
+**Gap 1 — Pre-unlock placed after network awaits (Android 12, critical)**
+The v2 fix created `_unlock = new Audio(data:…)` inside `runPipeline()`, which is
+called with `await` from the click handler. By the time `_unlock` was constructed,
+the call stack had already crossed two real network `await`s (`/scan-and-plan` +
+`res.json()`). Android 12 Chrome invalidates the user-gesture activation token after
+the first I/O `await`, so the element was constructed outside the gesture window and
+the unlock was a no-op.
+
+**Fix:** Move the pre-unlock into the `btnSubmit` click handler, *before*
+`await runPipeline()`, so it executes synchronously while the gesture token is live.
+Store directly in the module-level `ttsAudio` variable (not a local) so it persists
+across the full async chain. Remove the now-redundant local `_unlock` from
+`runPipeline()` and the `preUnlockedAudio` parameter from `ttsPlay()`.
+
+**Gap 2 — Missing `ttsAudio.load()` after `.src` assignment (Android 12, critical)**
+When reusing an existing `HTMLAudioElement`, assigning a new `.src` without calling
+`.load()` leaves the media pipeline in an indeterminate state on some Android Chrome
+builds. `.play()` may resolve immediately but produce no audio.
+
+**Fix:** Call `ttsAudio.load()` after `ttsAudio.src = url` and before `ttsAudio.play()`.
+
+**Gap 3 — `recognition.onerror` did not reset `ttsListening` (Android 16, critical)**
+The v2 fix handled `InvalidStateError` in `startCmdListener()`'s try/catch, but did
+not account for errors that fire *after* recognition has started — e.g. `network`,
+`audio-capture`. These arrive via `recognition.onerror`, which previously only reset
+`isListening` and showed a mic error. `ttsListening` was left stuck `true` with
+recognition dead, permanently silencing all voice commands.
+
+**Fix:** `recognition.onerror` now mirrors `recognition.onend`: when `ttsListening`
+is true, reset it to `false` and call `scheduleRearm()` (gated on TTS still active),
+then return without showing a mic error.
+
+**Gap 4 — 700 ms rearm delay marginal (Android 16, medium)**
+Analysis confirmed some Pixel devices on newer Chrome builds need up to 1200 ms for
+the recognition service to reset. 700 ms was within the probable range but not reliable
+across the device population.
+
+**Fix:** Rearm delay increased from 700 ms to 1200 ms.
+
+**Changes (1 file — `frontend/app.js`, 7 edits):**
+- `btnSubmit` click handler: pre-unlock `ttsAudio` as singleton before `await runPipeline()`
+- `runPipeline()`: remove local `_unlock` block; call `ttsPlay()` with no argument
+- `ttsPlay()`: remove `preUnlockedAudio` parameter; add `ttsAudio.load()` after `.src` assignment
+- `recognition.onerror`: add `ttsListening` rollback + gated `scheduleRearm()`
+- `scheduleRearm()`: delay 700 ms → 1200 ms
+
+**Test file (`tests/test_android_tts.html`) updated:** all three tests now exercise the
+corrected code paths, including the singleton pre-unlock pattern and the `onerror` rollback.
+
+**No backend changes. No new packages. Desktop Chrome behaviour unchanged.**
+
+## 2026-03-06 (v3 — follow-up to v2 Android TTS fixes)
+
+### Fix: Android 12 audio still blocked; Android 16 voice commands still dying after first use
+
+Post-deployment testing and Perplexity-assisted analysis revealed three remaining gaps in the v2 fixes.
+
+**Gap 1 — Pre-unlock placed after network awaits (Android 12, critical)**
+The v2 fix created `_unlock = new Audio(data:…)` inside `runPipeline()`, which runs after
+two real network `await`s. Android 12 Chrome invalidates the user-gesture activation token
+after the first I/O `await`, so the element was constructed outside the gesture window and
+the unlock was a no-op. The token must be captured synchronously before any `await`.
+
+**Fix:** Pre-unlock moved into the `btnSubmit` click handler, before `await runPipeline()`,
+stored directly in the module-level `ttsAudio` singleton. The local `_unlock` block and the
+`preUnlockedAudio` parameter of `ttsPlay()` are removed.
+
+**Gap 2 — Missing `ttsAudio.load()` after `.src` reassignment (Android 12, critical)**
+Assigning a new `.src` to a reused `HTMLAudioElement` without calling `.load()` leaves the
+media pipeline in an indeterminate state on some Android Chrome builds.
+
+**Fix:** `ttsAudio.load()` added after `ttsAudio.src = url`, before `ttsAudio.play()`.
+
+**Gap 3 — `recognition.onerror` did not reset `ttsListening` (Android 16, critical)**
+Errors firing *after* recognition starts (e.g. `network`, `audio-capture`) arrive via
+`recognition.onerror`. The handler only reset `isListening` — `ttsListening` was left stuck
+`true` with recognition dead, permanently silencing all voice commands.
+
+**Fix:** `recognition.onerror` now mirrors `recognition.onend`: when `ttsListening` is true,
+reset it and call `scheduleRearm()` (gated on TTS still active), then return.
+
+**Gap 4 — Rearm delay 700 ms marginal (Android 16, medium)**
+Some Pixel devices on newer Chrome builds need up to 1200 ms for recognition service reset.
+
+**Fix:** Rearm delay increased from 700 ms to 1200 ms.
+
+**Changes (1 file — `frontend/app.js`, 7 targeted edits):**
+- `btnSubmit` click: pre-unlock `ttsAudio` singleton before `await runPipeline()`
+- `runPipeline()`: remove `_unlock` block; call `ttsPlay()` with no argument
+- `ttsPlay()`: remove `preUnlockedAudio` parameter; add `ttsAudio.load()` after `.src`
+- `recognition.onerror`: add `ttsListening` rollback + gated `scheduleRearm()`
+- `scheduleRearm()`: delay 700 ms → 1200 ms
+
+**No backend changes. No new packages. Desktop Chrome behaviour unchanged.**

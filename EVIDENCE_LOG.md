@@ -26,3 +26,14 @@ This file captures sample runs, logs, and evidence that the system works as inte
   commands (play, pause, stop, listen) functional across multiple plan-generation cycles.
 - **Desktop Chrome:** No regression — all existing behaviour unchanged.
 - **Test page:** `tests/test_android_tts.html` tests 1–3 pass on target devices.
+
+## 2026-03-06 (v3) -- Android TTS v3 fixes
+
+- **Android 12 / Chrome:** Pre-unlock now happens synchronously in `btnSubmit` click
+  handler before `await runPipeline()`. `ttsAudio.load()` added after `.src` assignment.
+  `play()` resolves on the pre-unlocked singleton; Audio unavailable no longer shown.
+- **Android 16 / Chrome:** `recognition.onerror` now resets `ttsListening` and calls
+  `scheduleRearm()` on non-silent errors during cmd-listening, matching `onend` behaviour.
+  Rearm delay increased to 1200 ms. Voice commands functional across multiple cycles.
+- **Desktop Chrome:** No regression observed.
+- **Test page:** `tests/test_android_tts.html` tests 1-3 updated to reflect v3 fixes.

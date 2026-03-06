@@ -257,6 +257,12 @@ function updateSubmitState() {
 // ── Submit ────────────────────────────────────────────────────────────────────
 btnSubmit.addEventListener('click', async () => {
   if (btnSubmit.disabled) return;
+  // Pre-unlock ttsAudio synchronously BEFORE any await, capturing the
+  // user-gesture activation token on Android 12 Chrome.
+  if (ttsAudio) { ttsAudio.pause(); if (ttsAudio.src) URL.revokeObjectURL(ttsAudio.src); }
+  ttsAudio = new Audio();
+  ttsAudio.play().catch(() => {});
+  ttsAudio.pause();
   await runPipeline();
 });
 
@@ -291,13 +297,7 @@ async function runPipeline() {
     todayCardEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     ttsText = buildTtsScript(card);
-    // Pre-unlock an Audio element synchronously to capture the user-gesture
-    // activation token on Android 12 Chrome, which invalidates it after
-    // network I/O async awaits. ttsPlay() reuses this element for real audio.
-    const _unlock = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
-    _unlock.play().catch(() => {});
-    _unlock.pause();
-    ttsPlay(_unlock);
+    ttsPlay();
   } catch (err) {
     showError(err.message || 'Something went wrong. Please try again.');
   } finally {
@@ -494,6 +494,11 @@ function initSpeech() {
   recognition.onerror = (event) => {
     isListening = false;
     updateMicUI();
+    if (ttsListening) {
+      ttsListening = false;
+      if (ttsAudio !== null || ttsUsingWebSpeech) scheduleRearm();
+      return;
+    }
     const silent = ['no-speech', 'aborted'];
     if (!silent.includes(event.error)) showMicError(event.error || 'Microphone error. Please try again.');
   };
@@ -534,8 +539,8 @@ function cancelRearm() {
 }
 function scheduleRearm() {
   cancelRearm();
-  // 700 ms lets Android Chrome recognition service fully reset before next start().
-  rearmTimer = setTimeout(() => { rearmTimer = null; startCmdListener(); }, 700);
+  // 1200 ms lets Android Chrome recognition service fully reset before next start().
+  rearmTimer = setTimeout(() => { rearmTimer = null; startCmdListener(); }, 1200);
 }
 
 function startCmdListener() {
@@ -617,7 +622,7 @@ function webSpeechStop() {
 }
 
 // ── TTS – core ────────────────────────────────────────────────────────────────
-async function ttsPlay(preUnlockedAudio) {
+async function ttsPlay() {
   if (ttsFetching) return;
 
   // Resume WebSpeech if paused
@@ -665,14 +670,10 @@ async function ttsPlay(preUnlockedAudio) {
 
     const blob = await res.blob();
     const url  = URL.createObjectURL(blob);
-    if (ttsAudio) { ttsAudio.pause(); URL.revokeObjectURL(ttsAudio.src); }
-    // Reuse pre-unlocked Audio element when available (Android 12 autoplay fix).
-    if (preUnlockedAudio) {
-      ttsAudio = preUnlockedAudio;
-      ttsAudio.src = url;
-    } else {
-      ttsAudio = new Audio(url);
-    }
+    if (ttsAudio) { ttsAudio.pause(); if (ttsAudio.src) URL.revokeObjectURL(ttsAudio.src); }
+    if (!ttsAudio) ttsAudio = new Audio();
+    ttsAudio.src = url;
+    ttsAudio.load();
     ttsAudio.onplay  = () => { updateTtsUI('playing'); startCmdListener(); };
     ttsAudio.onpause = () => { updateTtsUI('paused'); };
     ttsAudio.onended = () => { updateTtsUI('idle'); stopCmdListener(); };

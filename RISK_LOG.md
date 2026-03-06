@@ -14,5 +14,5 @@ This file captures key risks and mitigations.
 - [ ] Auto-capture countdown may fire before the user has finished positioning the camera; users can toggle back to manual capture or use "Retake".
 - [ ] WebSpeech TTS fallback voice quality and language support vary by browser and OS; on-screen plan card is always the authoritative output.
 - [ ] WebSpeech TTS may not be available in all browsers (e.g., some headless or privacy-hardened environments); audio playback is convenience only.
-- [ ] Android 12 Chrome: user-gesture activation token expires after network I/O `await`s; mitigated by pre-unlocking an `Audio` element synchronously in the click handler before any `await`.
-- [ ] Android Chrome (all versions): `recognition.start()` may throw `InvalidStateError` during the service cool-down window between sessions; mitigated by rolling back `ttsListening` and scheduling a 700 ms rearm retry.
+- [ ] Android 12 Chrome: user-gesture activation token expires after the first network I/O `await`; mitigated by pre-unlocking the `ttsAudio` singleton synchronously in the `btnSubmit` click handler before `await runPipeline()`.
+- [ ] Android Chrome (all versions): `recognition.start()` may throw `InvalidStateError` during cool-down, or `recognition.onerror` may fire with `network`/`audio-capture` during cmd-listening; both paths now reset `ttsListening` and schedule a 1200 ms rearm retry.
