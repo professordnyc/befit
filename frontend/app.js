@@ -486,8 +486,11 @@ function initSpeech() {
       if (ttsAudio !== null || ttsUsingWebSpeech) scheduleRearm();
       return;
     }
-    // Query mic: restart only when always-on AND TTS is not active.
-    if (alwaysOn && !ttsUsingWebSpeech && ttsAudio === null) {
+    // Query mic: restart only when always-on AND neither a pipeline fetch
+    // nor TTS playback is active. ttsFetching covers the window between
+    // ttsReset() and the blob arriving, so the mic is never stolen by
+    // an always-on restart while the cmd listener is about to arm.
+    if (alwaysOn && !ttsUsingWebSpeech && !ttsFetching && ttsAudio === null) {
       setTimeout(() => { if (alwaysOn) startListening(); }, 300);
     }
   };
@@ -546,8 +549,13 @@ function scheduleRearm() {
 function startCmdListener() {
   if (!recognition || ttsListening) return;
   ttsListening = true;
-  if (isListening) return;   // already running — flag flip is enough; don't restart
-  stopListening();            // stop query-mic; onend will fire but ttsListening guards it
+  // Always stop any running session explicitly so onend fires a clean restart.
+  // On Android Chrome, leaving a query-mode session running and relying on the
+  // ttsListening flag alone is unreliable: the continuous:false session ends on
+  // its silence timeout before the user speaks, and the mode-switch is racy.
+  // An explicit stop triggers onend where ttsListening=true guards the branch
+  // and scheduleRearm() starts a clean command-mode session.
+  stopListening();            // stop query-mic; onend fires, ttsListening guards it
   try {
     recognition.start();
   } catch (e) {
@@ -717,7 +725,13 @@ function ttsRestart() {
 
 function ttsReset() {
   if (ttsUsingWebSpeech) { webSpeechStop(); }
-  if (ttsAudio) { ttsAudio.pause(); URL.revokeObjectURL(ttsAudio.src); ttsAudio = null; }
+  if (ttsAudio) {
+    ttsAudio.onplay = ttsAudio.onpause = ttsAudio.onended = ttsAudio.onerror = null;
+    ttsAudio.pause();
+    if (ttsAudio.src) { URL.revokeObjectURL(ttsAudio.src); ttsAudio.src = ''; }
+    // Keep element alive: non-null ttsAudio blocks the always-on query-mic restart
+    // in recognition.onend while the pipeline fetch is still in progress.
+  }
   stopCmdListener();
   ttsText = '';
   ttsFetching = false;

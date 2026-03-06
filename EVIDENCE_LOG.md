@@ -37,3 +37,14 @@ This file captures sample runs, logs, and evidence that the system works as inte
   Rearm delay increased to 1200 ms. Voice commands functional across multiple cycles.
 - **Desktop Chrome:** No regression observed.
 - **Test page:** `tests/test_android_tts.html` tests 1-3 updated to reflect v3 fixes.
+
+## 2026-03-06 (v4) — Always-on voice command fix
+
+- **Android Chrome (all versions, always-on enabled):** Three race conditions between
+  the always-on query mic and the TTS cmd listener identified and resolved. `ttsReset()`
+  no longer nulls `ttsAudio`, blocking the spurious always-on restart during the fetch
+  window. `recognition.onend` restart gated on `!ttsFetching`. `startCmdListener()`
+  always stops the current session explicitly before arming command mode.
+- **Expected behaviour post-fix:** voice commands (play, pause, stop, listen) trigger
+  correctly after plan generation with always-on enabled, on all Android Chrome versions.
+- **Desktop Chrome:** No regression. Always-on query mic continues to function normally.

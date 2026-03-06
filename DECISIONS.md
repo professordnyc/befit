@@ -628,3 +628,57 @@ Some Pixel devices on newer Chrome builds need up to 1200 ms for recognition ser
 - `scheduleRearm()`: delay 700 ms → 1200 ms
 
 **No backend changes. No new packages. Desktop Chrome behaviour unchanged.**
+
+## 2026-03-06 (v4 — always-on mic / voice command fix)
+
+### Fix: Voice commands never reach command mode on Android Chrome with always-on enabled
+
+Root-cause analysis revealed that the always-on mic and the TTS command listener share
+a single `SpeechRecognition` instance whose mode (query vs command) is controlled by
+the `ttsListening` boolean. Three structural race conditions prevented voice commands
+from ever reaching the command-mode branch of `recognition.onresult` on Android Chrome.
+
+**Race 1 — `ttsReset()` nulls `ttsAudio`, unblocking the always-on restart (root cause)**
+
+`ttsReset()` — called at the top of `runPipeline()` — set `ttsAudio = null` then
+called `stopListening()`, which fired `recognition.onend` asynchronously. By the time
+`onend` ran, `ttsAudio` was `null`. The always-on guard at `onend` (`ttsAudio === null`)
+evaluated `true` and restarted the query-mode mic ~300 ms into the pipeline fetch.
+That session ran in query mode for the entire duration of the `/scan-and-plan` + `/tts`
+round-trip (~5–15 s), consuming the microphone before the cmd listener could arm.
+
+**Fix:** `ttsReset()` now detaches handlers, pauses, and clears `.src` on the existing
+`ttsAudio` element — but does **not** null the variable. A non-null `ttsAudio` keeps
+the `onend` always-on guard false throughout the entire fetch window.
+
+**Race 2 — Always-on restart not gated on `ttsFetching` (secondary guard)**
+
+As a belt-and-suspenders defence for the first-run case (where `ttsAudio` is null before
+any submission), the always-on restart condition in `recognition.onend` was not gated on
+whether a pipeline fetch was in progress. A `!ttsFetching` check is added so the query
+mic can never restart while `ttsPlay()`'s `/tts` fetch is outstanding.
+
+**Fix:** `recognition.onend` always-on branch now reads:
+`alwaysOn && !ttsUsingWebSpeech && !ttsFetching && ttsAudio === null`.
+
+**Race 3 — `startCmdListener()` "flag-flip is enough" early-return (Android incompatibility)**
+
+When the always-on session had restarted and `isListening` was `true` at the moment
+`startCmdListener()` was called from `ttsAudio.onplay`, the function set
+`ttsListening = true` and returned without stopping the running session. The intent was
+that the existing session would pick up the flag and route results to command mode. On
+Android Chrome this is unreliable: `continuous: false` sessions end on a ~7 s silence
+timeout independently of the flag; the mode-switch is racy; and the session may have
+already consumed ambient speech in query mode. An explicit `stopListening()` forces
+`recognition.onend` to fire, where `ttsListening = true` guards the rearm branch and
+`scheduleRearm()` starts a clean, dedicated command-mode session.
+
+**Fix:** Removed the `if (isListening) return` early-return from `startCmdListener()`.
+`stopListening()` is now always called, regardless of `isListening` state.
+
+**Changes (1 file — `frontend/app.js`, 3 targeted edits):**
+- `ttsReset()`: reset state on `ttsAudio` element without nulling the variable
+- `recognition.onend`: add `!ttsFetching` to always-on restart condition
+- `startCmdListener()`: remove early-return; always call `stopListening()` explicitly
+
+**No backend changes. No new packages. Desktop Chrome behaviour unchanged.**
