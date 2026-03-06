@@ -226,6 +226,7 @@ uv run black --check backend/ tests/
 - **Multimodal I/O** – text, voice, image, video frame, audio
 - **Camera capture** – manual tap or 3-second auto-countdown
 - **TTS with voice commands** – play, pause, stop, listen control
+  - _Note:_ works best in Chrome desktop. On Android Chrome the recognition service is suspended while audio plays and may take several hundred milliseconds to re‑arm; use the on‑screen player controls as a fallback.
 - **Smart fallbacks** – WebSpeech API when ElevenLabs unavailable
 - **Mobile-first design** – responsive, accessible, touch-optimized
 - **Safety by design** – rule-based risk flags, clear disclaimers, no diagnoses or dosing

@@ -478,6 +478,9 @@ fallback path (ElevenLabs unavailable = 100% WebSpeech in this environment):
 
 ### Fix: Android 12 audio unavailable; Android 16 voice commands dead after first use
 
+> **Background:** the underlying issue is not a bug in our logic but a quirk of Android Chrome itself. The browser mutes the microphone during playback and destroys the `SpeechRecognition` session, then refuses to restart it for several hundred milliseconds. This means that even if we create a separate `SpeechRecognition` object the second instance is just as likely to be killed, so the only viable strategy is to share one recogniser and re‑arm it with a delay. Desktop Chrome does not behave this way, which explains why voice commands work reliably there.
+
+
 **Problem (Android 12 — "Audio unavailable"):**
 `ttsPlay()` is invoked from the `btnSubmit` click handler after two real network
 `await`s (`/scan-and-plan`, `/tts`). Android 12 Chrome invalidates the
