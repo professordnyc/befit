@@ -473,3 +473,55 @@ fallback path (ElevenLabs unavailable = 100% WebSpeech in this environment):
 - `recognition.onerror`: suppresses both `'no-speech'` and `'aborted'` (programmatic stop).
 
 **All 10 existing tests pass. No new packages, no backend changes.**
+
+## 2026-03-06
+
+### Fix: Android 12 audio unavailable; Android 16 voice commands dead after first use
+
+**Problem (Android 12 — "Audio unavailable"):**
+`ttsPlay()` is invoked from the `btnSubmit` click handler after two real network
+`await`s (`/scan-and-plan`, `/tts`). Android 12 Chrome invalidates the
+user-gesture activation token after the first network I/O `await`, so every
+subsequent `HTMLAudioElement.play()` call throws `NotAllowedError`. The previous
+fix surfaced the error to the UI ("⚠️ Audio unavailable") but did not prevent it —
+audio was still blocked.
+
+**Problem (Android 16 — voice commands stop working):**
+Two compounding causes in the command-listener rearm cycle:
+
+1. `recognition.start()` throws `InvalidStateError` on Android Chrome while the
+   recognition service is cooling down between sessions (typically 300–600 ms). The
+   previous `catch (_) { /* ignore */ }` silently consumed the error, leaving
+   `ttsListening = true` permanently with recognition not running. No future `onend`
+   could fire to trigger a rearm, so all voice commands were silently dropped.
+
+2. The 300 ms rearm delay (`scheduleRearm`) was shorter than the Android Chrome
+   recognition service reset window (~500–700 ms), compounding cause 1.
+
+**Fix (1 file — `frontend/app.js`, 3 targeted edits + 1 line in test):**
+
+- **Pre-unlock pattern (Android 12):** Inside the `btnSubmit` click handler,
+  immediately before any `await`, construct a silent-WAV `Audio` element and call
+  `.play().catch(()=>{})` + `.pause()`. This captures the user-gesture activation
+  token synchronously. `ttsPlay()` now accepts an optional `preUnlockedAudio`
+  parameter; when present, the real blob URL is assigned to `.src` on that element
+  and `play()` succeeds because the browser treats a previously-unlocked element as
+  trusted even after the token has expired.
+
+- **`ttsListening` rollback (Android 16, cause 1):** In `startCmdListener()`,
+  wrapped `recognition.start()` in a proper `try/catch`. On `InvalidStateError`,
+  rolls `ttsListening` back to `false` and calls `scheduleRearm()` so the next
+  attempt is queued rather than lost.
+
+- **Rearm delay increase (Android 16, cause 2):** `scheduleRearm()` delay raised
+  from 300 ms to 700 ms to give the Android Chrome recognition service time to fully
+  reset before the next `start()` call.
+
+**Test:** `tests/test_android_tts.html` updated with 3 targeted tests:
+- Test 1 verifies the pre-unlock element survives 4 async hops and `play()` succeeds.
+- Test 2 unit-tests `startCmdListener` with a stubbed `InvalidStateError`, confirming
+  `ttsListening` rolls back and `scheduleRearm` is called.
+- Test 3 exercises the full play → pause → resume → stop cycle verifying the `.src`
+  resume guard and cmd-listener rearm.
+
+**No backend changes. No new packages. Desktop Chrome behaviour unchanged.**

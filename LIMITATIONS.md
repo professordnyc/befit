@@ -24,6 +24,8 @@ This document describes what Befit does **not** do and important safety constrai
 - Visual analysis is based only on visible labels/packaging in the frame.
 - Audio output is for convenience only and does not change the non-medical nature of guidance.
 - Voice commands ("play", "pause", "stop", "listen") control audio playback only; they do not re-run the wellness pipeline or alter the plan.
+- On Android 12 Chrome, audio playback depends on a pre-unlocked `Audio` element created synchronously in the submit gesture. If the gesture is not a direct tap (e.g., triggered programmatically), audio may be unavailable; the on-screen plan card remains the authoritative output.
+- On Android Chrome, voice commands may take up to 700 ms to re-arm after each utterance ends while the recognition service resets. Tapping the on-screen player bar buttons is always the reliable fallback.
 - Speech recognition for voice commands may mishear words in noisy environments; use the on-screen player bar buttons as a fallback.
 - TTS uses ElevenLabs when available; falls back to the browser's WebSpeech API (`window.speechSynthesis`) automatically. Voice quality and language support in fallback mode depend on the device and browser.
 - Auto-capture fires after a 3-second countdown; the timer resets on every camera restart or retake. Users who prefer manual control should leave the Auto-capture toggle off (default).
