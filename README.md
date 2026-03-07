@@ -268,6 +268,31 @@ The backend `/scan-and-plan` endpoint returns:
 
 ---
 
+
+---
+
+## 🔭 What's Next
+
+### Befit v2
+- **Improved latency** – faster end-to-end response times across the scan-and-plan pipeline
+- **Multi-model & auto/smart model selection** – dynamically route to the best model for each task (vision, reasoning, summarization) based on cost, speed, and capability
+- **Database** – persistent storage for user sessions, plan history, and pantry/cabinet snapshots
+- **Security** – authentication, rate limiting, input validation hardening, and secrets management improvements
+- **Additional multimodal options** – expanded support for video walkthroughs, receipt scanning, and richer image inputs
+- **Social features** – share plans, caregiving circles, and community wellness challenges
+
+### Shelf v1+
+- **Actions Concierge** – a proactive agent that surfaces timely, context-aware micro-actions; available as an optional Befit agent or as a lightweight standalone tool
+
+### Platform
+- **Native & React Native build** – mobile app for iOS and Android with offline-first capabilities
+- **Beta testing** – structured rollout with real users (women and caregivers) to gather safety feedback and improve UX
+- **Online documentation, SDK, and API for builders** – public-facing docs, developer SDK, and open API so others can build on Befit's wellness intelligence
+
+### Growth & Sustainability
+- **Word of mouth and marketing** – community-driven growth, partnerships with wellness organizations and caregiver networks
+- **Funding and revenue-generation opportunities with forever-free options** – explore grants, partnerships, and premium tiers while keeping the core experience free and accessible
+
 ## 📝 License
 
 MIT
