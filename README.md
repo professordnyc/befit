@@ -48,6 +48,7 @@ Befit’s behavior and guardrails are documented in a small set of source-of-tru
 - **EVIDENCE_LOG.md** – Supporting log for references, test runs, and external sources (used in judging for Proof).  
 - **RISK_LOG.md** – Supporting log for known risks and mitigations (used in judging for Rigor).  
 - **LIMITATIONS.md** – Supporting log for explicit safety constraints, out‑of‑scope behavior, and what Befit will not do.
+- **TRACE_LOG.md** – Trace log for recording agent execution traces, debugging notes, and workflow observations used to improve transparency and reproducibility.
 
 ---
 
@@ -270,5 +271,6 @@ The backend `/scan-and-plan` endpoint returns:
 ## 📝 License
 
 MIT
+
 
 
