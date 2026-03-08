@@ -38,6 +38,16 @@ Core Flow (Phone-First, Low Friction)
 5. Goose orchestrates vision and text analysis via a single, linear workflow defined in `befit_scan_and_plan.yaml`, which the Planner agent runs end‑to‑end to produce a **Today’s Plan** card (items detected, short explanation, 2–3 suggested actions, and safety notes).  
 6. Optionally, Befit reads the answer back via text‑to‑speech with simple voice controls (play, pause, stop, listen).
 
+---
+
+## 🏆 CreateHER #75Her Submission
+
+Branch efit-v1-75her matches the CreateHER #75Her submission.
+This branch is the stable reference for judges; commit 4ea112b is the exact snapshot submitted.
+Main is treated as historical truth for the judging window (through **March 16, 2026**) — no force-pushes during this period.
+
+---
+
 Sources of Truth
 ----------------
 
